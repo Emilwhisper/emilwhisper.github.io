@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Sopa de Letras</title>
+
+<style>
+
+body{
+font-family:Arial;
+text-align:center;
+}
+
+#grid{
+display:grid;
+gap:2px;
+justify-content:center;
+margin-top:20px;
+touch-action:none;
+}
+
+.cell{
+width:32px;
+height:32px;
+border:1px solid #aaa;
+display:flex;
+align-items:center;
+justify-content:center;
+font-weight:bold;
+font-size:18px;
+background:white;
+}
+
+.selected{
+background:yellow;
+}
+
+.found{
+background:lightgreen;
+}
+
+#lista{
+margin-top:20px;
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+gap:6px;
+max-width:600px;
+margin-left:auto;
+margin-right:auto;
+}
+
+#lista div{
+padding:4px;
+border-radius:6px;
+background:#eee;
+font-size:14px;
+}
+
+body.dark #lista div{
+background:#333;
+}
+
+.foundWord{
+color:white;
+background:#28a745 !important;
+}
+
+.foundWord{
+color:green;
+font-weight:bold;
+}
+
+body.dark{
+background:#121212;
+color:white;
+}
+
+body.dark .cell{
+background:#1e1e1e;
+border:1px solid #555;
+color:white;
+}
+
+body.dark .selected{
+background:#777700;
+}
+
+body.dark .found{
+background:#006600;
+}
+
+</style>
+</head>
+
+<body>
+<button onclick="toggleDarkMode()">🌙 Dark Mode</button>
+<h1> Beijinhos Mummy :) ( <a href="indextest.html">Pagina2</a> ) </h1>
+<h2>Sopa de Letras</h2>
+
+X <input id="sizeX" type="number" value="12" min="10">
+Y <input id="sizeY" type="number" value="12" min="10">
+
+
+<button onclick="gerar()">Gerar</button>
+
+<div id="grid"></div>
+
+<h3>Palavras</h3>
+<div id="lista"></div>
+
+<script>
+
+let grid=[]
+let palavrasSelecionadas=[]
+let palavras=[]
+let selecionadas=[]
+let startCell=null
+
+function toggleDarkMode(){
+
+document.body.classList.toggle("dark")
+
+}
+
+async function gerar(){
+
+let X=parseInt(sizeX.value)
+let Y=parseInt(sizeY.value)
+
+let maxWord=Math.min(X,Y)
+
+let txt = await fetch("palavras.txt").then(r=>r.text())
+
+let dict=txt.split("\n")
+.map(w=>w.trim().toUpperCase())
+.filter(w=>w.length>3 && w.length<=maxWord)
+
+grid=[]
+
+for(let y=0;y<Y;y++){
+grid[y]=[]
+for(let x=0;x<X;x++)
+grid[y][x]=""
+}
+
+let dirs=[[1,0],[0,1],[1,1],[-1,1]]
+
+
+
+function colocar(p){
+
+for(let t=0;t<100;t++){
+
+let d=dirs[Math.floor(Math.random()*dirs.length)]
+
+let x=Math.floor(Math.random()*X)
+let y=Math.floor(Math.random()*Y)
+
+let ok=true
+
+for(let i=0;i<p.length;i++){
+
+let nx=x+d[0]*i
+let ny=y+d[1]*i
+
+if(nx<0||ny<0||nx>=X||ny>=Y){ok=false;break}
+
+if(grid[ny][nx]!="" && grid[ny][nx]!=p[i]){ok=false;break}
+
+}
+
+if(ok){
+
+for(let i=0;i<p.length;i++){
+
+let nx=x+d[0]*i
+let ny=y+d[1]*i
+
+grid[ny][nx]=p[i]
+
+}
+
+return true
+}
+
+}
+
+return false
+}
+
+dict.sort(()=>Math.random()-0.5)
+
+palavras=dict.slice(0,10)
+
+palavras.forEach(p=>colocar(p))
+
+let letras="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+for(let y=0;y<Y;y++)
+for(let x=0;x<X;x++)
+if(grid[y][x]=="")
+grid[y][x]=letras[Math.floor(Math.random()*26)]
+
+mostrar(X,Y)
+mostrarLista()
+
+}
+
+function mostrar(X,Y){
+
+let gridDiv = document.getElementById("grid")
+
+gridDiv.innerHTML=""
+gridDiv.style.gridTemplateColumns=`repeat(${X},32px)`
+
+for(let y=0;y<Y;y++)
+for(let x=0;x<X;x++){
+
+let d=document.createElement("div")
+
+d.className="cell"
+d.innerText=grid[y][x]
+
+d.dataset.x=x
+d.dataset.y=y
+
+d.addEventListener("touchstart",touchStart)
+d.addEventListener("touchmove",touchMove)
+d.addEventListener("touchend",touchEnd)
+
+gridDiv.appendChild(d)
+
+}
+
+}
+
+function mostrarLista(){
+
+lista.innerHTML=""
+
+palavras.forEach(p=>{
+
+let d=document.createElement("div")
+
+d.id="w_"+p
+d.innerText=p
+
+lista.appendChild(d)
+
+})
+
+}
+
+function touchStart(e){
+
+let dirSelecionada = null // direção da linha
+
+selecionadas=[]
+startCell=e.target
+
+selecionar(e.target)
+
+}
+
+function touchMove(e){
+    let touch=e.touches[0]
+    let el=document.elementFromPoint(touch.clientX,touch.clientY)
+
+    if(el && el.classList.contains("cell") && !selecionadas.includes(el)){
+
+        // calcular direção da primeira célula
+        if(selecionadas.length==1){
+            let dx = el.dataset.x - startCell.dataset.x
+            let dy = el.dataset.y - startCell.dataset.y
+
+            // normalizar direção para -1,0,1
+            dirSelecionada = [Math.sign(dx), Math.sign(dy)]
+        }
+
+        // verificar se a célula segue a direção
+        if(dirSelecionada){
+            let last = selecionadas[selecionadas.length-1]
+            let expectedX = parseInt(last.dataset.x) + dirSelecionada[0]
+            let expectedY = parseInt(last.dataset.y) + dirSelecionada[1]
+
+            if(parseInt(el.dataset.x)==expectedX && parseInt(el.dataset.y)==expectedY){
+                selecionar(el)
+            }
+        }
+    }
+
+    // desenhar linha atual
+    if(selecionadas.length>0){
+        let startRect = startCell.getBoundingClientRect()
+        let rect = el.getBoundingClientRect()
+        let gridRect = gridDiv.getBoundingClientRect()
+        let x1 = startRect.left + startRect.width/2 - gridRect.left
+        let y1 = startRect.top + startRect.height/2 - gridRect.top
+        let x2 = rect.left + rect.width/2 - gridRect.left
+        let y2 = rect.top + rect.height/2 - gridRect.top
+        redrawPermanentLines() // limpa permanente
+        drawLine(x1,y1,x2,y2) // desenha a linha atual por cima
+    }
+}
+
+function touchEnd(){
+
+    let palavra = selecionadas.map(c=>c.innerText).join("")
+    let palavraR = [...palavra].reverse().join("")
+
+    // continua tudo dentro de touchEnd, só organizei a ordem
+    let permanentLines = []
+
+    function drawPermanentLine(cells){
+        if(cells.length<2) return
+        let gridRect = gridDiv.getBoundingClientRect()
+        let startRect = cells[0].getBoundingClientRect()
+        let endRect = cells[cells.length-1].getBoundingClientRect()
+
+        let x1 = startRect.left + startRect.width/2 - gridRect.left
+        let y1 = startRect.top + startRect.height/2 - gridRect.top
+        let x2 = endRect.left + endRect.width/2 - gridRect.left
+        let y2 = endRect.top + endRect.height/2 - gridRect.top
+
+        permanentLines.push([x1,y1,x2,y2])
+        redrawPermanentLines()
+    }
+
+    function redrawPermanentLines(){
+        ctx.clearRect(0,0,canvas.width,canvas.height)
+        ctx.lineWidth = 6
+        ctx.strokeStyle = "orange"
+        permanentLines.forEach(line=>{
+            ctx.beginPath()
+            ctx.moveTo(line[0],line[1])
+            ctx.lineTo(line[2],line[3])
+            ctx.stroke()
+        })
+    }
+
+    if(palavras.includes(palavra) || palavras.includes(palavraR)){
+
+        if(navigator.vibrate){
+            navigator.vibrate(120)
+        }
+
+        let correta = palavras.includes(palavra) ? palavra : palavraR
+
+        // marcar na lista
+        document.getElementById("w_"+correta).classList.add("foundWord")
+
+        // marcar células
+        selecionadas.forEach(c=>{
+            c.classList.remove("selected")
+            c.classList.add("found")
+        })
+
+        // desenhar linha permanente
+        drawPermanentLine(selecionadas)
+
+    } else {
+
+        selecionadas.forEach(c=>c.classList.remove("selected"))
+
+    }
+
+}
+
+function selecionar(cell){
+
+cell.classList.add("selected")
+selecionadas.push(cell)
+
+}
+
+</script>
+
+</body>
+</html>
