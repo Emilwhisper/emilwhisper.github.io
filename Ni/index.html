@@ -41,6 +41,28 @@ background:lightgreen;
 
 #lista{
 margin-top:20px;
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+gap:6px;
+max-width:600px;
+margin-left:auto;
+margin-right:auto;
+}
+
+#lista div{
+padding:4px;
+border-radius:6px;
+background:#eee;
+font-size:14px;
+}
+
+body.dark #lista div{
+background:#333;
+}
+
+.foundWord{
+color:white;
+background:#28a745 !important;
 }
 
 .foundWord{
@@ -72,7 +94,7 @@ background:#006600;
 
 <body>
 <button onclick="toggleDarkMode()">🌙 Dark Mode</button>
-<h1> Beijinhos Nizinha :) </h1>
+<h1> Beijinhos Mummy :) ( <a href="indextest.html">Pagina2</a> ) </h1>
 <h2>Sopa de Letras</h2>
 
 X <input id="sizeX" type="number" value="12" min="10">
@@ -231,6 +253,8 @@ lista.appendChild(d)
 
 function touchStart(e){
 
+let dirSelecionada = null // direção da linha
+
 selecionadas=[]
 startCell=e.target
 
@@ -239,18 +263,44 @@ selecionar(e.target)
 }
 
 function touchMove(e){
+    let touch=e.touches[0]
+    let el=document.elementFromPoint(touch.clientX,touch.clientY)
 
-let touch=e.touches[0]
+    if(el && el.classList.contains("cell") && !selecionadas.includes(el)){
 
-let el=document.elementFromPoint(touch.clientX,touch.clientY)
+        // calcular direção da primeira célula
+        if(selecionadas.length==1){
+            let dx = el.dataset.x - startCell.dataset.x
+            let dy = el.dataset.y - startCell.dataset.y
 
-if(el && el.classList.contains("cell")){
+            // normalizar direção para -1,0,1
+            dirSelecionada = [Math.sign(dx), Math.sign(dy)]
+        }
 
-if(!selecionadas.includes(el))
-selecionar(el)
+        // verificar se a célula segue a direção
+        if(dirSelecionada){
+            let last = selecionadas[selecionadas.length-1]
+            let expectedX = parseInt(last.dataset.x) + dirSelecionada[0]
+            let expectedY = parseInt(last.dataset.y) + dirSelecionada[1]
 
-}
+            if(parseInt(el.dataset.x)==expectedX && parseInt(el.dataset.y)==expectedY){
+                selecionar(el)
+            }
+        }
+    }
 
+    // desenhar linha atual
+    if(selecionadas.length>0){
+        let startRect = startCell.getBoundingClientRect()
+        let rect = el.getBoundingClientRect()
+        let gridRect = gridDiv.getBoundingClientRect()
+        let x1 = startRect.left + startRect.width/2 - gridRect.left
+        let y1 = startRect.top + startRect.height/2 - gridRect.top
+        let x2 = rect.left + rect.width/2 - gridRect.left
+        let y2 = rect.top + rect.height/2 - gridRect.top
+        redrawPermanentLines() // limpa permanente
+        drawLine(x1,y1,x2,y2) // desenha a linha atual por cima
+    }
 }
 
 function touchEnd(){
@@ -259,6 +309,58 @@ let palavra=selecionadas.map(c=>c.innerText).join("")
 let palavraR=[...palavra].reverse().join("")
 
 if(palavras.includes(palavra) || palavras.includes(palavraR)){
+
+if(navigator.vibrate){
+navigator.vibrate(120)
+}
+
+let permanentLines = []
+
+function drawPermanentLine(cells){
+    if(cells.length<2) return
+    let gridRect = gridDiv.getBoundingClientRect()
+    let startRect = cells[0].getBoundingClientRect()
+    let endRect = cells[cells.length-1].getBoundingClientRect()
+
+    let x1 = startRect.left + startRect.width/2 - gridRect.left
+    let y1 = startRect.top + startRect.height/2 - gridRect.top
+    let x2 = endRect.left + endRect.width/2 - gridRect.left
+    let y2 = endRect.top + endRect.height/2 - gridRect.top
+
+    permanentLines.push([x1,y1,x2,y2])
+    redrawPermanentLines()
+}
+
+function redrawPermanentLines(){
+    ctx.clearRect(0,0,canvas.width,canvas.height)
+    ctx.lineWidth = 6
+    ctx.strokeStyle = "orange"
+    permanentLines.forEach(line=>{
+        ctx.beginPath()
+        ctx.moveTo(line[0],line[1])
+        ctx.lineTo(line[2],line[3])
+        ctx.stroke()
+    })
+}
+
+}
+
+
+if(palavras.includes(palavra) || palavras.includes(palavraR)){
+    let correta = palavras.includes(palavra)?palavra:palavraR
+
+    // marcar na lista
+    document.getElementById("w_"+correta).classList.add("foundWord")
+
+    // marcar células
+    selecionadas.forEach(c=>{
+        c.classList.remove("selected")
+        c.classList.add("found")
+    })
+
+    // desenhar linha permanente
+    drawPermanentLine(selecionadas)
+}
 
 let correta=palavras.includes(palavra)?palavra:palavraR
 
