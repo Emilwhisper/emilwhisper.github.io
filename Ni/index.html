@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Sopa de Letras</title>
+
+<style>
+
+body{
+font-family:Arial;
+text-align:center;
+}
+
+#grid{
+display:grid;
+gap:2px;
+justify-content:center;
+margin-top:20px;
+touch-action:none;
+}
+
+.cell{
+width:32px;
+height:32px;
+border:1px solid #aaa;
+display:flex;
+align-items:center;
+justify-content:center;
+font-weight:bold;
+font-size:18px;
+background:white;
+}
+
+.selected{
+background:yellow;
+}
+
+.found{
+background:lightgreen;
+}
+
+#lista{
+margin-top:20px;
+}
+
+.foundWord{
+color:green;
+font-weight:bold;
+}
+
+body.dark{
+background:#121212;
+color:white;
+}
+
+body.dark .cell{
+background:#1e1e1e;
+border:1px solid #555;
+color:white;
+}
+
+body.dark .selected{
+background:#777700;
+}
+
+body.dark .found{
+background:#006600;
+}
+
+</style>
+</head>
+
+<body>
+<button onclick="toggleDarkMode()">🌙 Dark Mode</button>
+<h1> Beijinhos Nizinha :) </h1>
+<h2>Sopa de Letras</h2>
+
+X <input id="sizeX" type="number" value="12" min="10">
+Y <input id="sizeY" type="number" value="12" min="10">
+
+
+<button onclick="gerar()">Gerar</button>
+
+<div id="grid"></div>
+
+<h3>Palavras</h3>
+<div id="lista"></div>
+
+<script>
+
+let grid=[]
+let palavrasSelecionadas=[]
+let palavras=[]
+let selecionadas=[]
+let startCell=null
+
+function toggleDarkMode(){
+
+document.body.classList.toggle("dark")
+
+}
+
+async function gerar(){
+
+let X=parseInt(sizeX.value)
+let Y=parseInt(sizeY.value)
+
+let maxWord=Math.min(X,Y)
+
+let txt = await fetch("palavras.txt").then(r=>r.text())
+
+let dict=txt.split("\n")
+.map(w=>w.trim().toUpperCase())
+.filter(w=>w.length>3 && w.length<=maxWord)
+
+grid=[]
+
+for(let y=0;y<Y;y++){
+grid[y]=[]
+for(let x=0;x<X;x++)
+grid[y][x]=""
+}
+
+let dirs=[[1,0],[0,1],[1,1],[-1,1]]
+
+
+
+function colocar(p){
+
+for(let t=0;t<100;t++){
+
+let d=dirs[Math.floor(Math.random()*dirs.length)]
+
+let x=Math.floor(Math.random()*X)
+let y=Math.floor(Math.random()*Y)
+
+let ok=true
+
+for(let i=0;i<p.length;i++){
+
+let nx=x+d[0]*i
+let ny=y+d[1]*i
+
+if(nx<0||ny<0||nx>=X||ny>=Y){ok=false;break}
+
+if(grid[ny][nx]!="" && grid[ny][nx]!=p[i]){ok=false;break}
+
+}
+
+if(ok){
+
+for(let i=0;i<p.length;i++){
+
+let nx=x+d[0]*i
+let ny=y+d[1]*i
+
+grid[ny][nx]=p[i]
+
+}
+
+return true
+}
+
+}
+
+return false
+}
+
+dict.sort(()=>Math.random()-0.5)
+
+palavras=dict.slice(0,10)
+
+palavras.forEach(p=>colocar(p))
+
+let letras="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+for(let y=0;y<Y;y++)
+for(let x=0;x<X;x++)
+if(grid[y][x]=="")
+grid[y][x]=letras[Math.floor(Math.random()*26)]
+
+mostrar(X,Y)
+mostrarLista()
+
+}
+
+function mostrar(X,Y){
+
+let gridDiv = document.getElementById("grid")
+
+gridDiv.innerHTML=""
+gridDiv.style.gridTemplateColumns=`repeat(${X},32px)`
+
+for(let y=0;y<Y;y++)
+for(let x=0;x<X;x++){
+
+let d=document.createElement("div")
+
+d.className="cell"
+d.innerText=grid[y][x]
+
+d.dataset.x=x
+d.dataset.y=y
+
+d.addEventListener("touchstart",touchStart)
+d.addEventListener("touchmove",touchMove)
+d.addEventListener("touchend",touchEnd)
+
+gridDiv.appendChild(d)
+
+}
+
+}
+
+function mostrarLista(){
+
+lista.innerHTML=""
+
+palavras.forEach(p=>{
+
+let d=document.createElement("div")
+
+d.id="w_"+p
+d.innerText=p
+
+lista.appendChild(d)
+
+})
+
+}
+
+function touchStart(e){
+
+selecionadas=[]
+startCell=e.target
+
+selecionar(e.target)
+
+}
+
+function touchMove(e){
+
+let touch=e.touches[0]
+
+let el=document.elementFromPoint(touch.clientX,touch.clientY)
+
+if(el && el.classList.contains("cell")){
+
+if(!selecionadas.includes(el))
+selecionar(el)
+
+}
+
+}
+
+function touchEnd(){
+
+let palavra=selecionadas.map(c=>c.innerText).join("")
+let palavraR=[...palavra].reverse().join("")
+
+if(palavras.includes(palavra) || palavras.includes(palavraR)){
+
+let correta=palavras.includes(palavra)?palavra:palavraR
+
+document.getElementById("w_"+correta).classList.add("foundWord")
+
+selecionadas.forEach(c=>{
+c.classList.remove("selected")
+c.classList.add("found")
+})
+
+}else{
+
+selecionadas.forEach(c=>c.classList.remove("selected"))
+
+}
+
+}
+
+function selecionar(cell){
+
+cell.classList.add("selected")
+selecionadas.push(cell)
+
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,16 @@
+casa
+porta
+janela
+computador
+livro
+carro
+cidade
+montanha
+rio
+floresta
+mar
+pessoa
+tempo
+vento
+terra
+fogo
