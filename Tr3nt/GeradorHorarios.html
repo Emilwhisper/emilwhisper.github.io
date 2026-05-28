@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El Horario Maker 3000 Benfica powered - Eijy</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .fade-in { animation: fadeIn 0.3s ease-in-out both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .calendar-cell { min-height: 120px; }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white; }
+      .print-break { page-break-after: always; }
+    }
+  </style>
+<base target="_blank">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="mb-8 no-print">
+      <h1 class="text-3xl font-bold text-slate-900 mb-2">El Horario Maker 3000</h1>
+      <p class="text-slate-500">Nao confies , verifica sempre tudo de novo.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-1 space-y-6 no-print">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            Setup de Empregados
+          </h2>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-slate-700 mb-1">Numero de pessoas</label>
+            <input type="number" id="numEmployees" min="1" max="50" value="4"
+              class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              onchange="updateEmployeeInputs()">
+          </div>
+          <div id="employeeList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Schedule Parameters
+          </h2>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Pessoas em prevençao dias de semana</label>
+              <p class="text-xs text-slate-500 mb-1">Cobertura: 7:30pm – 8:30am (dias de semana)</p>
+              <input type="number" id="weekdayStaff" min="1" max="10" value="1"
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Pessoas em prevençao Fim de semana ( 24h )</label>
+              <p class="text-xs text-slate-500 mb-1">Numero de pessoas fim de semana (24h)</p>
+              <input type="number" id="weekendStaff" min="1" max="10" value="1"
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Duração (semanas)</label>
+              <p class="text-xs text-slate-500 mb-1">Recomendado: 24/12 semanas para toraçao completa</p>
+              <input type="number" id="durationWeeks" min="1" max="52" value="12"
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Padrão de rotaçao</label>
+              <select id="rotationPattern" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                <option value="fair">Justo (balanced, no back-to-back)</option>
+                <option value="sequential">Sequential (A→B→C…)</option>
+                <option value="random">Randomizado</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="generateSchedule()"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md transition transform active:scale-95 flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+          Gerar Horario
+        </button>
+        <button onclick="window.print()"
+          class="w-full bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-xl border border-slate-300 transition flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+          Imprimir/Salvar PDF
+        </button>
+      </div>
+
+      <div class="lg:col-span-2">
+        <div id="emptyState" class="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+          <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <h3 class="text-lg font-semibold text-slate-900 mb-1">Isto está vazio :(</h3>
+          <p class="text-slate-500">Eijy : Configura tudo e clica no "gerar"</p>
+        </div>
+
+        <div id="scheduleContainer" class="hidden space-y-6">
+          <div class="grid grid-cols-3 gap-4">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
+              <div class="text-2xl font-bold text-blue-600" id="statWeeks">0</div>
+              <div class="text-xs text-slate-500 uppercase tracking-wide font-medium">Semanas</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
+              <div class="text-2xl font-bold text-blue-600" id="statShifts">0</div>
+              <div class="text-xs text-slate-500 uppercase tracking-wide font-medium">Total Shifts</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
+              <div class="text-2xl font-bold text-blue-600" id="statEmployees">0</div>
+              <div class="text-xs text-slate-500 uppercase tracking-wide font-medium">Empregados</div>
+            </div>
+          </div>
+          <div id="warningBox" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 flex items-start gap-2">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            <span id="warningText"></span>
+          </div>
+          <div id="calendarView" class="space-y-6"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    updateEmployeeInputs();
+
+    function updateEmployeeInputs() {
+      const count = parseInt(document.getElementById('numEmployees').value) || 0;
+      const container = document.getElementById('employeeList');
+      const existing = Array.from(container.querySelectorAll('input')).map(i => i.value);
+      container.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 fade-in';
+        div.innerHTML = `
+          <span class="text-sm text-slate-400 font-mono w-6">${i + 1}.</span>
+          <input type="text" placeholder="Nome do empregado ${i + 1}"
+            class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+            value="${existing[i] || ''}" id="emp-${i}">
+        `;
+        container.appendChild(div);
+      }
+    }
+
+    function getEmployees() {
+      const inputs = document.querySelectorAll('#employeeList input');
+      return Array.from(inputs).map((inp, i) => inp.value.trim() || `Employee ${i + 1}`);
+    }
+
+    function generateSchedule() {
+      const employees = getEmployees();
+      const weekdayStaff = parseInt(document.getElementById('weekdayStaff').value) || 1;
+      const weekendStaff = parseInt(document.getElementById('weekendStaff').value) || 1;
+      const weeks = parseInt(document.getElementById('durationWeeks').value) || 4;
+      const pattern = document.getElementById('rotationPattern').value;
+      const empCount = employees.length;
+
+      if (empCount < Math.max(weekdayStaff, weekendStaff)) {
+        alert('Nao ha empregados suficientes para as contas, tens de por mais pessoas ou reduzir pessoas por shift');
+        return;
+      }
+
+      const totalDays = weeks * 7;
+      const dayNames = ['Segunda','Terça','Quarta','Quinta','Sexta','Sabado','Domingo'];
+
+      // State per employee: shifts assigned, last day worked
+      let state = employees.map((name, idx) => ({
+        name,
+        idx,
+        shifts: 0,
+        lastDay: -999
+      }));
+
+      const schedule = [];
+      let forcedConsecutive = 0;
+
+      for (let day = 0; day < totalDays; day++) {
+        const dayOfWeek = day % 7;
+        const isWeekend = dayOfWeek >= 5;
+        const needed = isWeekend ? weekendStaff : weekdayStaff;
+
+        // Split into available (didn't work yesterday) and unavailable (worked yesterday)
+        let available = state.filter(e => e.lastDay !== day - 1);
+        let unavailable = state.filter(e => e.lastDay === day - 1);
+
+        // Sort both groups by fewest shifts, then longest rest
+        const sortKey = (a, b) => {
+          if (a.shifts !== b.shifts) return a.shifts - b.shifts;
+          return a.lastDay - b.lastDay;
+        };
+
+        if (pattern === 'random') {
+          // Shuffle within groups while keeping balance roughly equal
+          available = shuffleBalanced(available, day);
+          unavailable = shuffleBalanced(unavailable, day);
+        } else if (pattern === 'sequential') {
+          // Tie-break by original index order
+          available.sort((a, b) => {
+            if (a.shifts !== b.shifts) return a.shifts - b.shifts;
+            if (a.lastDay !== b.lastDay) return a.lastDay - b.lastDay;
+            return a.idx - b.idx;
+          });
+          unavailable.sort((a, b) => {
+            if (a.shifts !== b.shifts) return a.shifts - b.shifts;
+            if (a.lastDay !== b.lastDay) return a.lastDay - b.lastDay;
+            return a.idx - b.idx;
+          });
+        } else {
+          // Fair rotation
+          available.sort(sortKey);
+          unavailable.sort(sortKey);
+        }
+
+        let picks = [];
+        // Take all available first
+        picks = picks.concat(available.slice(0, needed));
+        // If still need more, take from unavailable (forced consecutive)
+        if (picks.length < needed) {
+          const extraNeeded = needed - picks.length;
+          picks = picks.concat(unavailable.slice(0, extraNeeded));
+          forcedConsecutive += extraNeeded;
+        }
+
+        // Update state
+        picks.forEach(p => {
+          const emp = state.find(e => e.idx === p.idx);
+          emp.shifts++;
+          emp.lastDay = day;
+        });
+
+        const weekNum = Math.floor(day / 7) + 1;
+        if (dayOfWeek === 0) {
+          schedule.push({ week: weekNum, days: [] });
+        }
+        schedule[schedule.length - 1].days.push({
+          day: dayNames[dayOfWeek],
+          isWeekend,
+          staff: picks.map(p => p.name),
+          type: isWeekend ? '24h Coverage' : 'Off-Hours (7:30pm-8:30am)'
+        });
+      }
+
+      renderSchedule(schedule, empCount, weeks, forcedConsecutive);
+    }
+
+    // Deterministic shuffle that tries to keep counts balanced
+    function shuffleBalanced(arr, seed) {
+      if (arr.length <= 1) return arr;
+      // Group by shift count to keep balance
+      const groups = {};
+      arr.forEach(item => {
+        const k = item.shifts;
+        if (!groups[k]) groups[k] = [];
+        groups[k].push(item);
+      });
+      // Shuffle each group
+      Object.values(groups).forEach(g => {
+        for (let i = g.length - 1; i > 0; i--) {
+          const j = (seed * 9301 + 49297) % 233280 / 233280; // simple LCG
+          seed = (seed * 9301 + 49297) % 233280;
+          const swapIdx = Math.floor(j * (i + 1));
+          [g[i], g[swapIdx]] = [g[swapIdx], g[i]];
+        }
+      });
+      // Concatenate groups in order of shift count (ascending)
+      return Object.keys(groups).sort((a,b) => a - b).flatMap(k => groups[k]);
+    }
+
+    function renderSchedule(schedule, empCount, weeks, forcedConsecutive) {
+      document.getElementById('emptyState').classList.add('hidden');
+      document.getElementById('scheduleContainer').classList.remove('hidden');
+
+      let totalShifts = 0;
+      schedule.forEach(w => w.days.forEach(d => totalShifts += d.staff.length));
+
+      document.getElementById('statWeeks').textContent = weeks;
+      document.getElementById('statShifts').textContent = totalShifts;
+      document.getElementById('statEmployees').textContent = empCount;
+
+      const warningBox = document.getElementById('warningBox');
+      if (forcedConsecutive > 0) {
+        warningBox.classList.remove('hidden');
+        document.getElementById('warningText').textContent =
+          `Warning: ${forcedConsecutive} shift(s) tiveram de ser dados a empregados a trabalhar dias seguidos, nao ha empregados suficientes para evitar dias consecutivos. Adiciona mais pessoas ou reduz empregados de prevençao.`;
+      } else {
+        warningBox.classList.add('hidden');
+      }
+
+      const container = document.getElementById('calendarView');
+      container.innerHTML = '';
+
+      schedule.forEach((week, wi) => {
+        const weekDiv = document.createElement('div');
+        weekDiv.className = 'bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden fade-in';
+        weekDiv.style.animationDelay = `${wi * 0.05}s`;
+
+        const header = document.createElement('div');
+        header.className = 'bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between';
+        const weekendShifts = week.days.filter(d => d.isWeekend).reduce((s, d) => s + d.staff.length, 0);
+        header.innerHTML = `
+          <h3 class="font-semibold text-slate-900">Week ${week.week}</h3>
+          <span class="text-xs text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">${weekendShifts} weekend shifts</span>
+        `;
+        weekDiv.appendChild(header);
+
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-7 divide-x divide-slate-100';
+
+        week.days.forEach(day => {
+          const cell = document.createElement('div');
+          cell.className = `calendar-cell p-3 ${day.isWeekend ? 'bg-amber-50/50' : 'bg-white'}`;
+          const badgeColor = day.isWeekend ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700';
+
+          cell.innerHTML = `
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold text-slate-500 uppercase">${day.day.substring(0,3)}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-medium ${badgeColor}">${day.isWeekend ? '24h' : 'Night'}</span>
+            </div>
+            <div class="space-y-1">
+              ${day.staff.map(s => `
+                <div class="flex items-center gap-1.5">
+                  <div class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">${s.charAt(0)}</div>
+                  <span class="text-sm text-slate-800 truncate">${s}</span>
+                </div>
+              `).join('')}
+            </div>
+            <div class="mt-2 text-[10px] text-slate-400 leading-tight">${day.type}</div>
+          `;
+          grid.appendChild(cell);
+        });
+
+        weekDiv.appendChild(grid);
+        container.appendChild(weekDiv);
+      });
+
+      // Distribution summary
+      const counts = {};
+      schedule.forEach(w => w.days.forEach(d => d.staff.forEach(s => {
+        counts[s] = (counts[s] || 0) + 1;
+      })));
+
+      const rows = Object.entries(counts).sort((a,b) => b[1] - a[1]).map(([name, count]) => `
+        <tr class="border-t border-slate-100">
+          <td class="px-4 py-2 text-sm text-slate-800">${name}</td>
+          <td class="px-4 py-2 text-sm text-slate-600">${count} shifts</td>
+          <td class="px-4 py-2 text-sm text-slate-600">${((count / totalShifts) * 100).toFixed(1)}%</td>
+        </tr>
+      `).join('');
+
+      const summaryDiv = document.createElement('div');
+      summaryDiv.className = 'bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden fade-in';
+      summaryDiv.innerHTML = `
+        <div class="bg-slate-50 px-5 py-3 border-b border-slate-200">
+          <h3 class="font-semibold text-slate-900">Distribuiçao total</h3>
+        </div>
+        <table class="w-full text-left">
+          <thead>
+            <tr class="text-xs text-slate-500 uppercase tracking-wide">
+              <th class="px-4 py-2 font-medium">Empregados</th>
+              <th class="px-4 py-2 font-medium">Numero de dias</th>
+              <th class="px-4 py-2 font-medium">Percentagem</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+      container.appendChild(summaryDiv);
+    }
+  </script>
+</body>
+</html>
