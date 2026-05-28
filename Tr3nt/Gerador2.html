@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -14,7 +14,26 @@
       body { background: white; }
       .print-break { page-break-after: always; }
     }
+    .toggle-btn {
+      transition: all 0.15s ease;
+    }
+    .toggle-btn.weekday-active {
+      background-color: #2563eb;
+      color: white;
+      border-color: #2563eb;
+    }
+    .toggle-btn.weekend-active {
+      background-color: #d97706;
+      color: white;
+      border-color: #d97706;
+    }
+    .toggle-btn.both-active {
+      background-color: #7c3aed;
+      color: white;
+      border-color: #7c3aed;
+    }
   </style>
+<base target="_blank">
 <base target="_blank">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
@@ -37,13 +56,18 @@
               class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
               onchange="updateEmployeeInputs()">
           </div>
-          <div id="employeeList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+          <div id="employeeList" class="space-y-2 max-h-80 overflow-y-auto pr-1"></div>
+          <div class="mt-3 flex gap-3 text-xs text-slate-500">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-600 inline-block"></span> Extra Semana</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-600 inline-block"></span> Extra Fim-de-semana</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-violet-600 inline-block"></span> Extra Ambos</span>
+          </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
           <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            Schedule Parameters
+            Parametros do Horario
           </h2>
           <div class="space-y-4">
             <div>
@@ -53,14 +77,14 @@
                 class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
             </div>
             <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Pessoas em prevençao Fim de semana ( 24h )</label>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Pessoas em prevençao Fim de semana (24h)</label>
               <p class="text-xs text-slate-500 mb-1">Numero de pessoas fim de semana (24h)</p>
               <input type="number" id="weekendStaff" min="1" max="10" value="1"
                 class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Duração (semanas)</label>
-              <p class="text-xs text-slate-500 mb-1">Recomendado: 24/12 semanas para toraçao completa</p>
+              <p class="text-xs text-slate-500 mb-1">Recomendado: 24/12 semanas para rotaçao completa</p>
               <input type="number" id="durationWeeks" min="1" max="52" value="12"
                 class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
             </div>
@@ -85,10 +109,6 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
           Imprimir/Salvar PDF
         </button>
-		<a href="Gerador2.html" class="no-print w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2 px-4 rounded-xl transition flex items-center justify-center gap-2 mb-2">
-  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-  Ir para Gerador 2.0
-</a>
       </div>
 
       <div class="lg:col-span-2">
@@ -108,7 +128,7 @@
             </div>
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
               <div class="text-2xl font-bold text-blue-600" id="statShifts">0</div>
-              <div class="text-xs text-slate-500 uppercase tracking-wide font-medium">Total Shifts</div>
+              <div class="text-xs text-slate-500 uppercase tracking-wide font-medium">Total Turnos</div>
             </div>
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
               <div class="text-2xl font-bold text-blue-600" id="statEmployees">0</div>
@@ -126,38 +146,97 @@
   </div>
 
   <script>
+    let extraToggles = {};
+
     updateEmployeeInputs();
 
     function updateEmployeeInputs() {
       const count = parseInt(document.getElementById('numEmployees').value) || 0;
       const container = document.getElementById('employeeList');
-      const existing = Array.from(container.querySelectorAll('input')).map(i => i.value);
+      const existing = Array.from(container.querySelectorAll('input[type="text"]')).map(i => i.value);
+      const oldToggles = { ...extraToggles };
+      extraToggles = {};
+
       container.innerHTML = '';
       for (let i = 0; i < count; i++) {
+        const key = 'emp-' + i;
+        extraToggles[key] = oldToggles[key] || { weekday: false, weekend: false };
+
         const div = document.createElement('div');
         div.className = 'flex items-center gap-2 fade-in';
         div.innerHTML = `
           <span class="text-sm text-slate-400 font-mono w-6">${i + 1}.</span>
-          <input type="text" placeholder="Nome do empregado ${i + 1}"
+          <input type="text" placeholder="Nome do empregado ${i + 1}" data-idx="${i}"
             class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-            value="${existing[i] || ''}" id="emp-${i}">
+            value="${existing[i] || ''}" id="${key}-name">
+          <button type="button" onclick="cycleExtra('${key}')" id="${key}-toggle"
+            class="toggle-btn text-[10px] font-bold px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-500 hover:bg-slate-50 whitespace-nowrap"
+            title="Clica para marcar como extra (baixa prioridade)">
+            EXTRA
+          </button>
         `;
         container.appendChild(div);
+        updateToggleVisual(key);
+      }
+    }
+
+    function cycleExtra(key) {
+      const t = extraToggles[key];
+      if (!t.weekday && !t.weekend) {
+        t.weekday = true;
+      } else if (t.weekday && !t.weekend) {
+        t.weekday = false;
+        t.weekend = true;
+      } else if (!t.weekday && t.weekend) {
+        t.weekday = true;
+        t.weekend = true;
+      } else {
+        t.weekday = false;
+        t.weekend = false;
+      }
+      updateToggleVisual(key);
+    }
+
+    function updateToggleVisual(key) {
+      const btn = document.getElementById(key + '-toggle');
+      if (!btn) return;
+      const t = extraToggles[key];
+      btn.className = 'toggle-btn text-[10px] font-bold px-2 py-1.5 rounded-lg border whitespace-nowrap ';
+      if (t.weekday && t.weekend) {
+        btn.classList.add('both-active');
+        btn.textContent = 'EXTRA (A)';
+      } else if (t.weekday) {
+        btn.classList.add('weekday-active');
+        btn.textContent = 'EXTRA (S)';
+      } else if (t.weekend) {
+        btn.classList.add('weekend-active');
+        btn.textContent = 'EXTRA (F)';
+      } else {
+        btn.classList.add('bg-white', 'text-slate-500', 'border-slate-300', 'hover:bg-slate-50');
+        btn.textContent = 'EXTRA';
       }
     }
 
     function getEmployees() {
-      const inputs = document.querySelectorAll('#employeeList input');
-      return Array.from(inputs).map((inp, i) => inp.value.trim() || `Employee ${i + 1}`);
+      const inputs = document.querySelectorAll('#employeeList input[type="text"]');
+      return Array.from(inputs).map((inp, i) => {
+        const key = 'emp-' + i;
+        return {
+          name: inp.value.trim() || `Empregado ${i + 1}`,
+          idx: i,
+          extraWeekday: extraToggles[key]?.weekday || false,
+          extraWeekend: extraToggles[key]?.weekend || false
+        };
+      });
     }
 
     function generateSchedule() {
-      const employees = getEmployees();
+      const allEmployees = getEmployees();
       const weekdayStaff = parseInt(document.getElementById('weekdayStaff').value) || 1;
       const weekendStaff = parseInt(document.getElementById('weekendStaff').value) || 1;
       const weeks = parseInt(document.getElementById('durationWeeks').value) || 4;
       const pattern = document.getElementById('rotationPattern').value;
-      const empCount = employees.length;
+      const empCount = allEmployees.length;
 
       if (empCount < Math.max(weekdayStaff, weekendStaff)) {
         alert('Nao ha empregados suficientes para as contas, tens de por mais pessoas ou reduzir pessoas por shift');
@@ -167,10 +246,9 @@
       const totalDays = weeks * 7;
       const dayNames = ['Segunda','Terça','Quarta','Quinta','Sexta','Sabado','Domingo'];
 
-      // State per employee: shifts assigned, last day worked
-      let state = employees.map((name, idx) => ({
-        name,
-        idx,
+      // Single state array — same objects used throughout
+      let state = allEmployees.map(e => ({
+        ...e,
         shifts: 0,
         lastDay: -999
       }));
@@ -181,55 +259,76 @@
       for (let day = 0; day < totalDays; day++) {
         const dayOfWeek = day % 7;
         const isWeekend = dayOfWeek >= 5;
-        const needed = isWeekend ? weekendStaff : weekdayStaff;
+        const baseNeeded = isWeekend ? weekendStaff : weekdayStaff;
 
-        // Split into available (didn't work yesterday) and unavailable (worked yesterday)
-        let available = state.filter(e => e.lastDay !== day - 1);
-        let unavailable = state.filter(e => e.lastDay === day - 1);
+        // Count how many extras are active for this day type
+        const activeExtras = state.filter(e => (isWeekend ? e.extraWeekend : e.extraWeekday));
+        const extraCount = activeExtras.length;
 
-        // Sort both groups by fewest shifts, then longest rest
-        const sortKey = (a, b) => {
-          if (a.shifts !== b.shifts) return a.shifts - b.shifts;
-          return a.lastDay - b.lastDay;
-        };
+        // Total needed = base + extras (extras ADD to the shift, not replace)
+        const needed = baseNeeded + extraCount;
 
-        if (pattern === 'random') {
-          // Shuffle within groups while keeping balance roughly equal
-          available = shuffleBalanced(available, day);
-          unavailable = shuffleBalanced(unavailable, day);
-        } else if (pattern === 'sequential') {
-          // Tie-break by original index order
-          available.sort((a, b) => {
+        // Split state into regulars and extras for this day type
+        const regulars = state.filter(e => !(isWeekend ? e.extraWeekend : e.extraWeekday));
+        const extras = state.filter(e => (isWeekend ? e.extraWeekend : e.extraWeekday));
+
+        function pickFrom(pool, n, forceIfNeeded) {
+          if (n <= 0 || pool.length === 0) return [];
+          let chosen = [];
+          let avail = pool.filter(e => e.lastDay !== day - 1);
+          let unavail = pool.filter(e => e.lastDay === day - 1);
+
+          const sortFn = (a, b) => {
             if (a.shifts !== b.shifts) return a.shifts - b.shifts;
-            if (a.lastDay !== b.lastDay) return a.lastDay - b.lastDay;
-            return a.idx - b.idx;
-          });
-          unavailable.sort((a, b) => {
-            if (a.shifts !== b.shifts) return a.shifts - b.shifts;
-            if (a.lastDay !== b.lastDay) return a.lastDay - b.lastDay;
-            return a.idx - b.idx;
-          });
-        } else {
-          // Fair rotation
-          available.sort(sortKey);
-          unavailable.sort(sortKey);
+            return a.lastDay - b.lastDay;
+          };
+
+          if (pattern === 'random') {
+            avail = shuffleBalanced(avail, day);
+            unavail = shuffleBalanced(unavail, day);
+          } else if (pattern === 'sequential') {
+            avail.sort((a, b) => {
+              if (a.shifts !== b.shifts) return a.shifts - b.shifts;
+              if (a.lastDay !== b.lastDay) return a.lastDay - b.lastDay;
+              return a.idx - b.idx;
+            });
+            unavail.sort((a, b) => {
+              if (a.shifts !== b.shifts) return a.shifts - b.shifts;
+              if (a.lastDay !== b.lastDay) return a.lastDay - b.lastDay;
+              return a.idx - b.idx;
+            });
+          } else {
+            avail.sort(sortFn);
+            unavail.sort(sortFn);
+          }
+
+          const fromAvail = Math.min(avail.length, n);
+          chosen = chosen.concat(avail.slice(0, fromAvail));
+          let stillNeed = n - fromAvail;
+
+          if (stillNeed > 0 && forceIfNeeded) {
+            const fromUnavail = Math.min(unavail.length, stillNeed);
+            chosen = chosen.concat(unavail.slice(0, fromUnavail));
+            forcedConsecutive += fromUnavail;
+          }
+
+          return chosen;
         }
 
         let picks = [];
-        // Take all available first
-        picks = picks.concat(available.slice(0, needed));
-        // If still need more, take from unavailable (forced consecutive)
-        if (picks.length < needed) {
-          const extraNeeded = needed - picks.length;
-          picks = picks.concat(unavailable.slice(0, extraNeeded));
-          forcedConsecutive += extraNeeded;
-        }
 
-        // Update state
+        // Pick base slots from regulars first
+        const regularPicks = pickFrom(regulars, baseNeeded, true);
+        picks = picks.concat(regularPicks);
+
+        // Pick extra slots from extras
+        const extraPicks = pickFrom(extras, extraCount, true);
+        picks = picks.concat(extraPicks);
+
+        // Update state on the SAME objects (by reference)
         picks.forEach(p => {
-          const emp = state.find(e => e.idx === p.idx);
-          emp.shifts++;
-          emp.lastDay = day;
+          p.shifts++;
+          p.lastDay = day;
         });
 
         const weekNum = Math.floor(day / 7) + 1;
@@ -244,33 +343,30 @@
         });
       }
 
-      renderSchedule(schedule, empCount, weeks, forcedConsecutive);
+      renderSchedule(schedule, empCount, weeks, forcedConsecutive, allEmployees, state);
     }
 
-    // Deterministic shuffle that tries to keep counts balanced
     function shuffleBalanced(arr, seed) {
       if (arr.length <= 1) return arr;
-      // Group by shift count to keep balance
       const groups = {};
       arr.forEach(item => {
         const k = item.shifts;
         if (!groups[k]) groups[k] = [];
         groups[k].push(item);
       });
-      // Shuffle each group
       Object.values(groups).forEach(g => {
+        let s = seed;
         for (let i = g.length - 1; i > 0; i--) {
-          const j = (seed * 9301 + 49297) % 233280 / 233280; // simple LCG
-          seed = (seed * 9301 + 49297) % 233280;
+          s = (s * 9301 + 49297) % 233280;
+          const j = s / 233280;
           const swapIdx = Math.floor(j * (i + 1));
           [g[i], g[swapIdx]] = [g[swapIdx], g[i]];
         }
       });
-      // Concatenate groups in order of shift count (ascending)
-      return Object.keys(groups).sort((a,b) => a - b).flatMap(k => groups[k]);
+      return Object.keys(groups).map(Number).sort((a, b) => a - b).flatMap(k => groups[k]);
     }
 
-    function renderSchedule(schedule, empCount, weeks, forcedConsecutive) {
+    function renderSchedule(schedule, empCount, weeks, forcedConsecutive, allEmployees, finalState) {
       document.getElementById('emptyState').classList.add('hidden');
       document.getElementById('scheduleContainer').classList.remove('hidden');
 
@@ -285,7 +381,7 @@
       if (forcedConsecutive > 0) {
         warningBox.classList.remove('hidden');
         document.getElementById('warningText').textContent =
-          `Warning: ${forcedConsecutive} shift(s) tiveram de ser dados a empregados a trabalhar dias seguidos, nao ha empregados suficientes para evitar dias consecutivos. Adiciona mais pessoas ou reduz empregados de prevençao.`;
+          `Atençao: ${forcedConsecutive} turno(s) tiveram de ser dados a empregados a trabalhar dias seguidos, nao ha empregados suficientes para evitar dias consecutivos. Adiciona mais pessoas ou reduz empregados de prevençao.`;
       } else {
         warningBox.classList.add('hidden');
       }
@@ -302,8 +398,8 @@
         header.className = 'bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between';
         const weekendShifts = week.days.filter(d => d.isWeekend).reduce((s, d) => s + d.staff.length, 0);
         header.innerHTML = `
-          <h3 class="font-semibold text-slate-900">Week ${week.week}</h3>
-          <span class="text-xs text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">${weekendShifts} weekend shifts</span>
+          <h3 class="font-semibold text-slate-900">Semana ${week.week}</h3>
+          <span class="text-xs text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">${weekendShifts} turnos fim-de-semana</span>
         `;
         weekDiv.appendChild(header);
 
@@ -318,7 +414,7 @@
           cell.innerHTML = `
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs font-semibold text-slate-500 uppercase">${day.day.substring(0,3)}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded font-medium ${badgeColor}">${day.isWeekend ? '24h' : 'Night'}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-medium ${badgeColor}">${day.isWeekend ? '24h' : 'Noite'}</span>
             </div>
             <div class="space-y-1">
               ${day.staff.map(s => `
@@ -337,32 +433,50 @@
         container.appendChild(weekDiv);
       });
 
-      // Distribution summary
-      const counts = {};
-      schedule.forEach(w => w.days.forEach(d => d.staff.forEach(s => {
-        counts[s] = (counts[s] || 0) + 1;
-      })));
+      // Calculate hours from schedule data
+      const hoursMap = {};
+      schedule.forEach(w => w.days.forEach(d => {
+        const h = d.isWeekend ? 24 : 13;
+        d.staff.forEach(s => {
+          hoursMap[s] = (hoursMap[s] || 0) + h;
+        });
+      }));
 
-      const rows = Object.entries(counts).sort((a,b) => b[1] - a[1]).map(([name, count]) => `
-        <tr class="border-t border-slate-100">
-          <td class="px-4 py-2 text-sm text-slate-800">${name}</td>
-          <td class="px-4 py-2 text-sm text-slate-600">${count} shifts</td>
-          <td class="px-4 py-2 text-sm text-slate-600">${((count / totalShifts) * 100).toFixed(1)}%</td>
-        </tr>
-      `).join('');
+      const rows = allEmployees.map(e => {
+        const empState = finalState.find(s => s.idx === e.idx);
+        const count = empState ? empState.shifts : 0;
+        const h = hoursMap[e.name] || 0;
+        const extraTags = [];
+        if (e.extraWeekday) extraTags.push('<span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Extra S</span>');
+        if (e.extraWeekend) extraTags.push('<span class="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Extra F</span>');
+        return `
+          <tr class="border-t border-slate-100 ${count === 0 ? 'bg-slate-50/50' : ''}">
+            <td class="px-4 py-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-sm ${count === 0 ? 'text-slate-400' : 'text-slate-800'}">${e.name}</span>
+                ${extraTags.join('')}
+              </div>
+            </td>
+            <td class="px-4 py-2 text-sm ${count === 0 ? 'text-slate-400' : 'text-slate-600'}">${count} turnos</td>
+            <td class="px-4 py-2 text-sm ${count === 0 ? 'text-slate-400' : 'text-slate-800 font-semibold'}">${h}h</td>
+            <td class="px-4 py-2 text-sm ${count === 0 ? 'text-slate-400' : 'text-slate-600'}">${totalShifts > 0 ? ((count / totalShifts) * 100).toFixed(1) : '0.0'}%</td>
+          </tr>
+        `;
+      }).join('');
 
       const summaryDiv = document.createElement('div');
       summaryDiv.className = 'bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden fade-in';
       summaryDiv.innerHTML = `
         <div class="bg-slate-50 px-5 py-3 border-b border-slate-200">
-          <h3 class="font-semibold text-slate-900">Distribuiçao total</h3>
+          <h3 class="font-semibold text-slate-900">Distribuiçao Total</h3>
         </div>
         <table class="w-full text-left">
           <thead>
             <tr class="text-xs text-slate-500 uppercase tracking-wide">
-              <th class="px-4 py-2 font-medium">Empregados</th>
-              <th class="px-4 py-2 font-medium">Numero de dias</th>
-              <th class="px-4 py-2 font-medium">Percentagem</th>
+              <th class="px-4 py-2 font-medium">Empregado</th>
+              <th class="px-4 py-2 font-medium">Turnos</th>
+              <th class="px-4 py-2 font-medium">Horas</th>
+              <th class="px-4 py-2 font-medium">%</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
