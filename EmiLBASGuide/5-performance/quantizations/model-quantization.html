@@ -124,7 +124,60 @@
 <li data-line="2" dir="auto"><span class="list-bullet"></span><strong>L (large):</strong> more tensors raised, biggest of the three, closest to the tier above, sometimes overlaps it in practice</li>
 </ul></div><div class="el-p"><p dir="auto">Only <strong>Q2_K, Q3_K, Q4_K, Q5_K</strong> get S/M/L variants in stock llama.cpp. Q6_K and Q8_0 ship as single fixed formats with no split.</p></div><div class="el-h3"><h3 data-heading="Q4's &quot;extra one&quot; , IQ4_NL" dir="auto" class="heading" id="Q4's_&quot;extra_one&quot;_,_IQ4_NL_0"><span class="heading-collapse-indicator collapse-indicator collapse-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon right-triangle"><path d="M3 8L12 17L21 8"></path></svg></span>Q4's "extra one" , IQ4_NL</h3></div><div class="el-p"><p dir="auto">At a size similar to Q4_K_S, it tends to preserve accuracy slightly better and decodes faster on CPU </p></div><div class="el-p"><p dir="auto">There is also many specific ways to "quantize" that aren't mentioned here, and probably many more to come.</p></div><div class="el-ul"><ul class="has-list-bullet">
 <li data-line="0" dir="auto"><span class="list-bullet"></span>Quality-loss column is general guess</li>
-</ul></div><div class="el-h2"><h2 data-heading="i-matrix" dir="auto" class="heading" id="i-matrix_0"><span class="heading-collapse-indicator collapse-indicator collapse-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon right-triangle"><path d="M3 8L12 17L21 8"></path></svg></span>i-matrix</h2></div><div class="el-p"><p dir="auto">Seems on Q8 it doesn't help , but Q6 and bellow it really helps.</p></div><div class="el-p"><p dir="auto">When model was quantized it was using an <strong>importance matrix</strong>: the quantizer ran calibration data through the full-precision model first to learn which weights matter most, then protected those during quantization</p></div><div class="el-p"><p dir="auto">Afaik it's simillar to APEX , in training you check what weights in the model actually move the output, and give more "value" to those.</p></div><div class="el-p"><p dir="auto">The catch: quality depends on what calibration dataset was used (code-heavy calibration vs general text calibration will bias the model's strengths slightly)</p></div><div class="el-p"><p dir="auto">usually at the same size, imatrix beats static.</p></div><div class="el-h2"><h2 data-heading="APEX" dir="auto" class="heading" id="APEX_0"><span class="heading-collapse-indicator collapse-indicator collapse-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon right-triangle"><path d="M3 8L12 17L21 8"></path></svg></span>APEX</h2></div><div class="el-p"><p dir="auto">APEX = "Adaptive Precision for EXpert Models" , it's specifically made for MoE models , since it uses different quants to different experts , it's nomenclature changes </p></div><div class="el-p"><p dir="auto">There are other things like this.</p></div><div class="footer"><div class="data-bar"></div></div></div></div></div><div id="right-content" class="leaf" style="--sidebar-width: var(--sidebar-width-right);"><div id="right-sidebar" class="sidebar"><div class="sidebar-handle"></div><div class="sidebar-topbar"><div class="topbar-content"><label class="theme-toggle-container" for="theme-toggle-input" id=""><input class="theme-toggle-input" type="checkbox" id="theme-toggle-input"><div class="toggle-background"></div></label></div><div class="clickable-icon sidebar-collapse-icon"><svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="svg-icon"><path d="M21 3H3C1.89543 3 1 3.89543 1 5V19C1 20.1046 1.89543 21 3 21H21C22.1046 21 23 20.1046 23 19V5C23 3.89543 22.1046 3 21 3Z"></path><path d="M10 4V20"></path><path d="M4 7H7"></path><path d="M4 10H7"></path><path d="M4 13H7"></path></svg></div></div><div class="sidebar-content-wrapper"><div id="right-sidebar-content" class="leaf-content"><div class="graph-view-wrapper"><div class="feature-header"><div class="feature-title">Interactive Graph</div></div><div class="graph-view-placeholder">
+</ul></div><div class="el-h2"><h2 data-heading="i-matrix" dir="auto" class="heading" id="i-matrix_0"><span class="heading-collapse-indicator collapse-indicator collapse-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon right-triangle"><path d="M3 8L12 17L21 8"></path></svg></span>i-matrix</h2></div><div class="el-p"><p dir="auto">Seems on higher <a data-href="Model Quantization" href="5-performance/quantizations/model-quantization.html" class="internal-link" target="_self" rel="noopener nofollow">Model Quantization</a> ( Q8+ ) it doesn't help , but Q6 and bellow it really helps.</p></div><div class="el-p"><p dir="auto">When model was quantized it was using an <strong>importance matrix</strong>: the quantizer ran calibration data through the full-precision model first to learn which weights matter most, then protected those during quantization</p></div><div class="el-p"><p dir="auto">The catch: quality depends on what calibration dataset was used (code-heavy calibration vs general text calibration will bias the model's strengths slightly)</p></div><div class="el-p"><p dir="auto"><strong>Isually</strong> at the same size, imatrix beats static.</p></div><div class="el-h2"><h2 data-heading="APEX" dir="auto" class="heading" id="APEX_0"><span class="heading-collapse-indicator collapse-indicator collapse-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon right-triangle"><path d="M3 8L12 17L21 8"></path></svg></span>APEX</h2></div><div class="el-p"><p dir="auto">APEX = "Adaptive Precision for EXpert Models" , it's specifically made for MoE models , since it uses different quants to different experts , it's nomenclature changes. </p></div><div class="el-p"><p dir="auto">For example this is based on <a data-tooltip-position="top" aria-label="https://huggingface.co/mudler/Qwen3.6-35B-A3B-APEX-MTP-GGUF/tree/main" rel="noopener nofollow" class="external-link is-unresolved" href="https://huggingface.co/mudler/Qwen3.6-35B-A3B-APEX-MTP-GGUF/tree/main" target="_self">Qwen3.6 35B MOE APEX</a> ( unsure if everything is like this ):</p></div><div class="el-table" dir="ltr" style="overflow-x: auto;"><table>
+<thead>
+<tr>
+<th dir="ltr">Tier</th>
+<th dir="ltr">Size (35B-A3B)</th>
+<th dir="ltr">Edge layers (attn/output)</th>
+<th dir="ltr">Middle layers (routed experts)</th>
+<th dir="ltr">Shared experts</th>
+<th dir="ltr">Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td dir="ltr">I-Nano</td>
+<td dir="ltr">11.7 GB</td>
+<td dir="ltr">Q4_K attention</td>
+<td dir="ltr">Q3_K routed experts</td>
+<td dir="ltr">Q5_K</td>
+<td dir="ltr">Smallest usable tier, biggest quality cliff</td>
+</tr>
+<tr>
+<td dir="ltr">I-Mini</td>
+<td dir="ltr">13.7 GB</td>
+<td dir="ltr">Q4_K attention (tail-edge)</td>
+<td dir="ltr">Q3_K routed experts (near IQ2_S-class in some layers)</td>
+<td dir="ltr">Q5_K (tail-edge)</td>
+<td dir="ltr">Fits 16GB consumer GPUs</td>
+</tr>
+<tr>
+<td dir="ltr">I-Compact</td>
+<td dir="ltr">16.9 GB</td>
+<td dir="ltr">Q4_K edge layers</td>
+<td dir="ltr">Q3_K middle layers</td>
+<td dir="ltr">Q6_K</td>
+<td dir="ltr">Q3_K is the weak point</td>
+</tr>
+<tr>
+<td dir="ltr">I-Quality</td>
+<td dir="ltr">23.3 GB</td>
+<td dir="ltr">Higher-precision edges (3-tier gradient)</td>
+<td dir="ltr">Q5_K / IQ4_XS split</td>
+<td dir="ltr">Q8_0</td>
+<td dir="ltr">Lowest perplexity of any tier, even beats F16</td>
+</tr>
+<tr>
+<td dir="ltr">I-Balanced</td>
+<td dir="ltr">25.9 GB</td>
+<td dir="ltr">Q6_K edges</td>
+<td dir="ltr">Q5_K middle</td>
+<td dir="ltr">Q8_0</td>
+<td dir="ltr">Matches Q8_0 perplexity exactly, smaller + faster</td>
+</tr>
+</tbody>
+</table></div><div class="el-p"><p dir="auto">( the I means it's using imatrix )</p></div><div class="footer"><div class="data-bar"></div></div></div></div></div><div id="right-content" class="leaf" style="--sidebar-width: var(--sidebar-width-right);"><div id="right-sidebar" class="sidebar"><div class="sidebar-handle"></div><div class="sidebar-topbar"><div class="topbar-content"><label class="theme-toggle-container" for="theme-toggle-input" id=""><input class="theme-toggle-input" type="checkbox" id="theme-toggle-input"><div class="toggle-background"></div></label></div><div class="clickable-icon sidebar-collapse-icon"><svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="svg-icon"><path d="M21 3H3C1.89543 3 1 3.89543 1 5V19C1 20.1046 1.89543 21 3 21H21C22.1046 21 23 20.1046 23 19V5C23 3.89543 22.1046 3 21 3Z"></path><path d="M10 4V20"></path><path d="M4 7H7"></path><path d="M4 10H7"></path><path d="M4 13H7"></path></svg></div></div><div class="sidebar-content-wrapper"><div id="right-sidebar-content" class="leaf-content"><div class="graph-view-wrapper"><div class="feature-header"><div class="feature-title">Interactive Graph</div></div><div class="graph-view-placeholder">
 		<div class="graph-view-container">
 			<div class="graph-icon graph-expand" role="button" aria-label="Expand" data-tooltip-position="top"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg></div>
 			<div class="graph-icon graph-global" role="button" aria-label="Global Graph" data-tooltip-position="top"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon lucide-git-fork"><circle cx="12" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"></path><path d="M12 12v3"></path></svg></div>
