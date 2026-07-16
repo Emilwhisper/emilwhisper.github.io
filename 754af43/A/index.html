@@ -1,0 +1,1331 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Daniel Catches the Car</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #05060a;
+      overflow: hidden;
+      font-family: system-ui, Segoe UI, Arial, sans-serif;
+      user-select: none;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+    }
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+
+  let W = innerWidth, H = innerHeight, DPR = Math.max(1, devicePixelRatio || 1);
+  function resize() {
+    W = innerWidth;
+    H = innerHeight;
+    DPR = Math.max(1, devicePixelRatio || 1);
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  const ROAD_HALF = 9;
+  const SHOULDER_LIMIT = 15.5;
+  const FAR = 1150;
+  const NEAR = 2.3;
+
+  const lanes = [-6.2, -2.1, 2.1, 6.2];
+
+  const tankCaps = [100, 150, 220, 320];
+  const tankCosts = [260, 650, 1350];
+  const turboCosts = [300, 850, 1500];
+  const armorCosts = [300, 800, 1450];
+  const freezerCost = 500;
+
+  const carTypes = [
+    { name: "Compact", value: 85,  hp: 36,  color: "#3fa7ff", w: 1.7, l: 3.7, h: 1.15, speed: 23 },
+    { name: "Sedan",   value: 125, hp: 50,  color: "#dedede", w: 1.9, l: 4.4, h: 1.20, speed: 25 },
+    { name: "SUV",     value: 185, hp: 78,  color: "#ff8f2d", w: 2.2, l: 4.9, h: 1.55, speed: 22 },
+    { name: "Sports",  value: 270, hp: 45,  color: "#f03345", w: 2.0, l: 4.3, h: 1.05, speed: 34 },
+    { name: "Luxury",  value: 410, hp: 66,  color: "#181818", w: 2.1, l: 4.8, h: 1.25, speed: 31 },
+    { name: "Box Van", value: 340, hp: 115, color: "#f7f0d0", w: 2.45,l: 5.9, h: 2.05, speed: 18 }
+  ];
+
+  const keys = {};
+  let state = "intro";
+  let introStep = 0;
+  let player, cars, places, messages, currentShop;
+  let nextPlaceZ = 260;
+  let nextTrafficZ = 80;
+  let carId = 1;
+  let placeId = 1;
+  let last = performance.now();
+  let shake = 0;
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function choice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function roman(n) { return ["0", "I", "II", "III"][n] || String(n); }
+  function money(n) { return "$" + Math.ceil(n); }
+
+  function addMessage(text, color = "#fff", life = 3.0) {
+    messages.push({ text, color, life });
+    if (messages.length > 7) messages.shift();
+  }
+
+  function newGame() {
+    player = {
+      x: 0,
+      z: 0,
+      speed: 0,
+      money: 120,
+      food: 100,
+      drink: 100,
+      gas: 100,
+      maxGas: 100,
+      tank: 0,
+      turbo: 0,
+      armor: 0,
+      freezer: false,
+      foodPacks: 0,
+      drinkPacks: 0,
+      attached: []
+    };
+    cars = [];
+    places = [];
+    messages = [];
+    currentShop = null;
+    nextPlaceZ = 260;
+    nextTrafficZ = 70;
+    carId = 1;
+    placeId = 1;
+    shake = 0;
+    state = "playing";
+    addMessage("Daniel found the keys. The yellow repo truck is ready.", "#ffe36d", 4);
+    ensureWorld();
+  }
+
+  function gameOver(reason) {
+    if (state === "gameover") return;
+    state = "gameover";
+    player.gameOverReason = reason;
+  }
+
+  function weightedPlaceType() {
+    const r = Math.random();
+    if (r < 0.25) return "Diner";
+    if (r < 0.45) return "Bar";
+    if (r < 0.70) return "Gas Station";
+    return "Garage";
+  }
+
+  function addPlace(z) {
+    const type = weightedPlaceType();
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const names = {
+      "Diner": ["Greasy Spoon", "Moonlit Diner", "Big Plate Diner", "Roadside Eggs"],
+      "Bar": ["The Last Call", "Bent Bumper Bar", "Rusty Tap", "The Wobbly Dog"],
+      "Gas Station": ["Panic Gas", "Last Chance Fuel", "Pump & Run", "Expensive Snacks"],
+      "Garage": ["Repo Yard", "Busted Axle Garage", "Cash-4-Cars", "Tow Bros"]
+    };
+    places.push({
+      id: placeId++,
+      type,
+      name: choice(names[type]),
+      z,
+      side,
+      x: side * (ROAD_HALF + rand(8, 10.5)),
+      stopX: side * (ROAD_HALF + 2.4),
+      color:
+        type === "Diner" ? "#f7e27b" :
+        type === "Bar" ? "#9b64ff" :
+        type === "Gas Station" ? "#44e17a" : "#ff9a3c"
+    });
+    nextPlaceZ = z + rand(430, 780);
+  }
+
+  function addTraffic(z) {
+    const count = Math.random() < 0.72 ? 1 : 2;
+    const laneBag = [...lanes].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < count; i++) {
+      const t = choice(carTypes);
+      const laneX = laneBag[i % laneBag.length];
+      cars.push({
+        id: carId++,
+        name: t.name,
+        x: laneX + rand(-0.18, 0.18),
+        laneX,
+        z: z + rand(-12, 12),
+        speed: clamp(t.speed + rand(-4, 6), 12, 40),
+        hp: t.hp,
+        maxHp: t.hp,
+        value: Math.ceil(t.value * rand(0.82, 1.22)),
+        color: t.color,
+        w: t.w,
+        l: t.l,
+        h: t.h,
+        totaled: false,
+        removed: false,
+        hitCd: 0,
+        smoke: rand(0, 10),
+        crush: rand(-0.22, 0.22)
+      });
+    }
+    nextTrafficZ = z + rand(65, 130);
+  }
+
+  function ensureWorld() {
+    while (nextPlaceZ < player.z + FAR + 450) addPlace(nextPlaceZ);
+    while (nextTrafficZ < player.z + FAR + 220) addTraffic(nextTrafficZ);
+
+    places = places.filter(p => p.z > player.z - 260);
+    cars = cars.filter(c => !c.removed && c.z > player.z - 220);
+  }
+
+  function updateNeeds(dt) {
+    player.food -= 0.09 * dt;
+    player.drink -= 0.125 * dt;
+
+    if (player.food <= 0 && player.freezer && player.foodPacks > 0) {
+      player.foodPacks--;
+      player.food = 26;
+      addMessage("Mini freezer save: Daniel ate emergency food.", "#9df", 3);
+    }
+    if (player.drink <= 0 && player.freezer && player.drinkPacks > 0) {
+      player.drinkPacks--;
+      player.drink = 28;
+      addMessage("Mini freezer save: Daniel drank emergency water.", "#9df", 3);
+    }
+  }
+
+  function updatePlaying(dt) {
+    ensureWorld();
+    updateNeeds(dt);
+
+    const throttle = keys.KeyW || keys.ArrowUp;
+    const brake = keys.KeyS || keys.ArrowDown;
+    const left = keys.KeyA || keys.ArrowLeft;
+    const right = keys.KeyD || keys.ArrowRight;
+    const boosting = (keys.Space || keys.ShiftLeft || keys.ShiftRight) && player.turbo > 0 && player.gas > 0;
+
+    let maxSpeed = 39 + player.turbo * 12 - player.attached.length * 2.8;
+    let accel = 18 + player.turbo * 2.7;
+
+    if (boosting) {
+      maxSpeed *= 1.18;
+      accel *= 1.45;
+    }
+
+    if (throttle && player.gas > 0) player.speed += accel * dt;
+    if (brake) player.speed -= 25 * dt;
+    if (!throttle && !brake) player.speed *= Math.pow(0.985, dt * 60);
+
+    player.speed = clamp(player.speed, -7, maxSpeed);
+
+    const steer = (right ? 1 : 0) - (left ? 1 : 0);
+    const steerPower = 3.0 + Math.min(Math.abs(player.speed), 58) * 0.115;
+    player.x += steer * steerPower * dt * (player.speed >= 0 ? 1 : -1);
+    player.x = clamp(player.x, -SHOULDER_LIMIT, SHOULDER_LIMIT);
+
+    if (Math.abs(player.x) > ROAD_HALF + 0.7) {
+      player.speed *= Math.pow(0.94, dt * 60);
+    }
+
+    player.z += player.speed * dt;
+    if (player.z < 0) {
+      player.z = 0;
+      player.speed = Math.max(0, player.speed);
+    }
+
+    if (Math.abs(player.speed) > 0.5) {
+      player.gas -= (Math.abs(player.speed) * 0.018 + (throttle ? 0.035 : 0) + (boosting ? 0.16 : 0)) * dt;
+    }
+
+    for (const c of cars) {
+      if (c.hitCd > 0) c.hitCd -= dt;
+
+      if (!c.totaled) {
+        c.z += c.speed * dt;
+        c.x += (c.laneX - c.x) * dt * 0.55;
+      } else {
+        c.smoke += dt;
+      }
+    }
+
+    checkCollisions(boosting);
+    checkGameOver();
+  }
+
+  function checkCollisions(boosting) {
+    for (const c of cars) {
+      const dz = c.z - player.z;
+      if (Math.abs(dz) > 6.5) continue;
+      const overlap = Math.abs(c.x - player.x) < (c.w * 0.62 + 1.25);
+      if (!overlap) continue;
+
+      if (c.totaled) {
+        player.speed *= 0.86;
+        c.x += (c.x > player.x ? 1 : -1) * 0.12;
+        shake = Math.max(shake, 4);
+        continue;
+      }
+
+      if (c.hitCd > 0) continue;
+
+      const relative = Math.max(8, player.speed - c.speed + (boosting ? 13 : 0) + (keys.Space ? 5 : 0));
+      const armorMul = 1 + player.armor * 0.58;
+      const dmg = relative * armorMul * (keys.Space ? 1.22 : 1.0);
+
+      c.hp -= dmg;
+      c.hitCd = 0.38;
+      c.speed *= 0.53;
+      c.x += (c.x > player.x ? 1 : -1) * rand(0.35, 0.8);
+      player.speed *= clamp(0.64 + player.armor * 0.055, 0.64, 0.82);
+      shake = Math.max(shake, 9);
+
+      if (c.hp <= 0) {
+        c.totaled = true;
+        c.speed = 0;
+        addMessage(`${c.name} totaled! Press T near it to hook it. Value ${money(c.value)}.`, "#ffdc68", 4);
+      } else {
+        addMessage(`RAM! ${c.name}: ${Math.ceil(c.hp)} hp left.`, "#ff8a8a", 1.3);
+      }
+    }
+  }
+
+  function checkGameOver() {
+    if (player.gas <= 0) gameOver("OUT OF GAS");
+    else if (player.food <= 0) gameOver("OUT OF FOOD");
+    else if (player.drink <= 0) gameOver("OUT OF WATER");
+  }
+
+  function getNearbyPlace(maxDz = 58) {
+    let best = null;
+    let bd = Infinity;
+    for (const p of places) {
+      const d = Math.abs(p.z - player.z);
+      if (d < maxDz && d < bd) {
+        best = p;
+        bd = d;
+      }
+    }
+    return best;
+  }
+
+  function getTowableCar() {
+    let best = null;
+    let bd = Infinity;
+    for (const c of cars) {
+      if (!c.totaled || c.removed) continue;
+      const dz = Math.abs(c.z - player.z);
+      const dx = Math.abs(c.x - player.x);
+      const d = dz + dx * 2;
+      if (dz < 15 && dx < 4.5 && d < bd) {
+        best = c;
+        bd = d;
+      }
+    }
+    return best;
+  }
+
+  function tryTow() {
+    if (state !== "playing") return;
+    const c = getTowableCar();
+    if (!c) {
+      addMessage("No totaled car close enough. Ram one, slow down, then press T.", "#ddd", 2);
+      return;
+    }
+    if (player.attached.length >= 3) {
+      addMessage("Tow rig is full: maximum 3 cars attached. Find a garage.", "#ffce68", 3);
+      return;
+    }
+    c.removed = true;
+    player.attached.push({
+      name: c.name,
+      value: c.value,
+      color: c.color
+    });
+    addMessage(`Hooked ${c.name}. Attached ${player.attached.length}/3.`, "#8eff8a", 3);
+  }
+
+  function tryInteract() {
+    if (state !== "playing") return;
+    const p = getNearbyPlace(60);
+    if (!p) {
+      addMessage("No stop nearby.", "#ddd", 1.6);
+      return;
+    }
+    if (Math.abs(player.speed) > 7.5) {
+      addMessage("Slow down before stopping.", "#ffcf5f", 2);
+      return;
+    }
+    if (Math.abs(player.x - p.stopX) > 5.2) {
+      addMessage(`Pull onto the ${p.side < 0 ? "left" : "right"} shoulder for ${p.name}.`, "#ffcf5f", 2.3);
+      return;
+    }
+    player.speed = 0;
+    currentShop = p;
+    state = "shop";
+    addMessage(`Stopped at ${p.name}.`, "#fff", 2);
+  }
+
+  function closeShop() {
+    currentShop = null;
+    state = "playing";
+  }
+
+  function spend(cost, successText, fn) {
+    cost = Math.ceil(cost);
+    if (player.money < cost) {
+      addMessage(`Not enough money. Need ${money(cost)}.`, "#ff8888", 2.3);
+      return false;
+    }
+    player.money -= cost;
+    fn && fn();
+    addMessage(successText, "#96ff96", 2.5);
+    return true;
+  }
+
+  function addFood(n) { player.food = clamp(player.food + n, 0, 100); }
+  function addDrink(n) { player.drink = clamp(player.drink + n, 0, 100); }
+  function addGas(n) { player.gas = clamp(player.gas + n, 0, player.maxGas); }
+  function freezerCap() { return player.freezer ? 4 : 0; }
+
+  function buyFreezerKit(cost) {
+    if (!player.freezer) {
+      addMessage("You need the mini freezer upgrade first.", "#ffcf5f", 2);
+      return;
+    }
+    const cap = freezerCap();
+    if (player.foodPacks >= cap && player.drinkPacks >= cap) {
+      addMessage("Mini freezer is already full.", "#ffcf5f", 2);
+      return;
+    }
+    spend(cost, "Freezer stocked with emergency food and drink.", () => {
+      player.foodPacks = Math.min(cap, player.foodPacks + 1);
+      player.drinkPacks = Math.min(cap, player.drinkPacks + 1);
+    });
+  }
+
+  function sellAttached() {
+    if (player.attached.length === 0) {
+      addMessage("No cars attached. Go total something first.", "#ffcf5f", 2.3);
+      return;
+    }
+    const total = player.attached.reduce((s, c) => s + c.value, 0);
+    const count = player.attached.length;
+    player.attached = [];
+    player.money += total;
+    addMessage(`Garage paid ${money(total)} for ${count} wrecked car${count === 1 ? "" : "s"}.`, "#8eff8a", 3.5);
+  }
+
+  function buyTank() {
+    if (player.tank >= 3) {
+      addMessage("Gas tank is already maxed.", "#ffcf5f", 2);
+      return;
+    }
+    const cost = tankCosts[player.tank];
+    spend(cost, `Gas tank upgraded to Stage ${roman(player.tank + 1)}.`, () => {
+      player.tank++;
+      const oldMax = player.maxGas;
+      player.maxGas = tankCaps[player.tank];
+      player.gas += Math.min(20, player.maxGas - oldMax);
+    });
+  }
+
+  function buyTurbo() {
+    if (player.turbo >= 3) {
+      addMessage("Turbo is already maxed.", "#ffcf5f", 2);
+      return;
+    }
+    const cost = turboCosts[player.turbo];
+    spend(cost, `Turbo upgraded to Stage ${roman(player.turbo + 1)}.`, () => player.turbo++);
+  }
+
+  function buyArmor() {
+    if (player.armor >= 3) {
+      addMessage("Armor is already maxed.", "#ffcf5f", 2);
+      return;
+    }
+    const cost = armorCosts[player.armor];
+    spend(cost, `Armor upgraded to Stage ${roman(player.armor + 1)}.`, () => player.armor++);
+  }
+
+  function buyFreezer() {
+    if (player.freezer) {
+      addMessage("Mini freezer already installed.", "#ffcf5f", 2);
+      return;
+    }
+    spend(freezerCost, "Mini freezer installed. You can carry emergency supplies.", () => {
+      player.freezer = true;
+      player.foodPacks = 1;
+      player.drinkPacks = 1;
+    });
+  }
+
+  function handleShopKey(code) {
+    if (code === "Escape" || code === "KeyE") {
+      closeShop();
+      return;
+    }
+
+    const t = currentShop.type;
+
+    if (t === "Diner") {
+      if (code === "Digit1") spend(22, "Daniel ate a diner plate.", () => addFood(38));
+      if (code === "Digit2") spend(18, "Daniel drank diner coffee and water.", () => addDrink(34));
+      if (code === "Digit3") spend(55, "Diner combo restored food and drink.", () => { addFood(48); addDrink(42); });
+      if (code === "Digit4") buyFreezerKit(58);
+    }
+
+    if (t === "Bar") {
+      if (code === "Digit1") spend(34, "Questionable bar food acquired.", () => addFood(30));
+      if (code === "Digit2") spend(16, "Daniel rehydrated at the bar.", () => addDrink(38));
+      if (code === "Digit3") spend(62, "Bar combo restored Daniel enough.", () => { addFood(38); addDrink(48); });
+      if (code === "Digit4") buyFreezerKit(64);
+    }
+
+    if (t === "Gas Station") {
+      if (code === "Digit1") spend(86, "Bought 25 gas.", () => addGas(25));
+      if (code === "Digit2") {
+        const need = player.maxGas - player.gas;
+        if (need <= 1) addMessage("Tank is already basically full.", "#ffcf5f", 2);
+        else spend(need * 3.25, "Filled the gas tank.", () => addGas(need));
+      }
+      if (code === "Digit3") spend(45, "Panic burger bought.", () => addFood(24));
+      if (code === "Digit4") spend(40, "Overpriced water bought.", () => addDrink(25));
+      if (code === "Digit5") buyFreezerKit(90);
+    }
+
+    if (t === "Garage") {
+      if (code === "Digit1") sellAttached();
+      if (code === "Digit2") buyTank();
+      if (code === "Digit3") buyTurbo();
+      if (code === "Digit4") buyFreezer();
+      if (code === "Digit5") buyArmor();
+    }
+  }
+
+  function consumePack() {
+    if (!player.freezer) {
+      addMessage("No mini freezer installed.", "#ffcf5f", 2);
+      return;
+    }
+    let used = false;
+    if (player.food < 90 && player.foodPacks > 0) {
+      player.foodPacks--;
+      addFood(34);
+      used = true;
+    }
+    if (player.drink < 90 && player.drinkPacks > 0) {
+      player.drinkPacks--;
+      addDrink(34);
+      used = true;
+    }
+    addMessage(used ? "Daniel used mini-freezer supplies." : "No useful freezer supplies available.", used ? "#9df" : "#ffcf5f", 2.3);
+  }
+
+  addEventListener("keydown", e => {
+    keys[e.code] = true;
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+
+    if (e.repeat) return;
+
+    if (state === "intro" && (e.code === "Space" || e.code === "Enter")) {
+      introStep++;
+      if (introStep > 2) newGame();
+      return;
+    }
+
+    if (state === "playing") {
+      if (e.code === "KeyE") tryInteract();
+      if (e.code === "KeyT") tryTow();
+      if (e.code === "KeyF") consumePack();
+    } else if (state === "shop") {
+      handleShopKey(e.code);
+    } else if (state === "gameover") {
+      if (e.code === "KeyR") {
+        introStep = 0;
+        newGame();
+      }
+    }
+  });
+
+  addEventListener("keyup", e => {
+    keys[e.code] = false;
+  });
+
+  addEventListener("mousedown", () => {
+    if (state === "intro") {
+      introStep++;
+      if (introStep > 2) newGame();
+    }
+  });
+
+  function project(x, dz) {
+    const f = Math.min(W * 0.92, 920);
+    const horizon = H * 0.385;
+    dz = Math.max(1.15, dz);
+    const scale = f / dz;
+    return {
+      x: W / 2 + (x - player.x) * scale,
+      y: horizon + 1.42 * f / dz,
+      scale
+    };
+  }
+
+  function poly(points, fill, stroke, width = 1) {
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    if (stroke) {
+      ctx.lineWidth = width;
+      ctx.strokeStyle = stroke;
+      ctx.stroke();
+    }
+  }
+
+  function groundStrip(x, width, zA, zB, color, alpha = 1) {
+    let dA = zA - player.z;
+    let dB = zB - player.z;
+    if (dB < NEAR || dA > FAR) return;
+    dA = clamp(dA, NEAR, FAR);
+    dB = clamp(dB, NEAR, FAR);
+    if (dB <= dA) return;
+    const p1 = project(x - width / 2, dA);
+    const p2 = project(x + width / 2, dA);
+    const p3 = project(x + width / 2, dB);
+    const p4 = project(x - width / 2, dB);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    poly([p1,p2,p3,p4], color);
+    ctx.restore();
+  }
+
+  function renderWorld() {
+    if (!player) return;
+
+    const sx = shake > 0 ? rand(-shake, shake) : 0;
+    const sy = shake > 0 ? rand(-shake, shake) : 0;
+    shake *= 0.86;
+    if (shake < 0.1) shake = 0;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.58);
+    sky.addColorStop(0, "#08142c");
+    sky.addColorStop(0.55, "#214d78");
+    sky.addColorStop(1, "#d69052");
+    ctx.fillStyle = sky;
+    ctx.fillRect(-20, -20, W + 40, H * 0.62);
+
+    ctx.fillStyle = "#193819";
+    ctx.fillRect(-20, H * 0.385, W + 40, H);
+
+    drawSunAndMountains();
+    drawRoad();
+    drawPlaces();
+
+    const visibleCars = cars
+      .filter(c => !c.removed && c.z - player.z > 2.3 && c.z - player.z < FAR)
+      .sort((a,b) => (b.z - player.z) - (a.z - player.z));
+    for (const c of visibleCars) drawTrafficCar(c);
+
+    drawPlayerTruck();
+    ctx.restore();
+
+    drawHUD();
+    if (state === "shop") drawShop();
+    if (state === "gameover") drawGameOver();
+  }
+
+  function drawSunAndMountains() {
+    ctx.save();
+    ctx.globalAlpha = 0.65;
+    ctx.fillStyle = "#ffd77a";
+    ctx.beginPath();
+    ctx.arc(W * 0.78, H * 0.22, Math.min(W,H) * 0.055, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#14253d";
+    ctx.beginPath();
+    ctx.moveTo(-30, H * 0.39);
+    for (let x = -30; x <= W + 30; x += W / 8) {
+      ctx.lineTo(x + W / 16, H * rand(0.28, 0.35));
+      ctx.lineTo(x + W / 8, H * 0.39);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRoad() {
+    const seg = 14;
+
+    for (let dFar = FAR; dFar > NEAR; dFar -= seg) {
+      const dNear = Math.max(NEAR, dFar - seg);
+      const a = Math.floor((player.z + dNear) / seg) % 2;
+      const c = a ? "#30343a" : "#292d33";
+
+      const lf = project(-ROAD_HALF, dFar);
+      const rf = project( ROAD_HALF, dFar);
+      const rn = project( ROAD_HALF, dNear);
+      const ln = project(-ROAD_HALF, dNear);
+
+      poly([lf, rf, rn, ln], c);
+    }
+
+    for (let z = Math.floor(player.z / 40) * 40; z < player.z + FAR; z += 40) {
+      for (const x of [-4.15, 0, 4.15]) {
+        groundStrip(x, 0.11, z + 6, z + 24, "#f3f0d2", 0.92);
+      }
+    }
+
+    for (let z = Math.floor(player.z / 28) * 28; z < player.z + FAR; z += 28) {
+      groundStrip(-ROAD_HALF + 0.18, 0.10, z, z + 22, "#f8e15d", 0.9);
+      groundStrip( ROAD_HALF - 0.18, 0.10, z, z + 22, "#f8e15d", 0.9);
+    }
+
+    for (const p of places) {
+      const d = p.z - player.z;
+      if (d > NEAR && d < FAR) {
+        groundStrip(p.stopX, 4.3, p.z - 20, p.z + 20, p.color, 0.25);
+      }
+    }
+  }
+
+  function drawPlaces() {
+    const visible = places
+      .filter(p => p.z - player.z > 3 && p.z - player.z < FAR)
+      .sort((a,b) => (b.z - player.z) - (a.z - player.z));
+
+    for (const p of visible) {
+      const dz = p.z - player.z;
+      const pr = project(p.x, dz);
+      const f = Math.min(W * 0.92, 920);
+      const bw = 9.5 * f / dz;
+      const bh = 5.2 * f / dz;
+      const y = pr.y;
+      const x = pr.x - bw / 2;
+
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(pr.x, y + 4, bw * 0.56, Math.max(2, bh * 0.12), 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = p.color;
+      ctx.fillRect(x, y - bh, bw, bh);
+
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillRect(x + bw * 0.08, y - bh * 0.75, bw * 0.28, bh * 0.22);
+      ctx.fillRect(x + bw * 0.48, y - bh * 0.75, bw * 0.28, bh * 0.22);
+
+      ctx.fillStyle = "#161616";
+      ctx.fillRect(x - bw * 0.05, y - bh - bh * 0.18, bw * 1.10, bh * 0.18);
+
+      ctx.fillStyle = "#111";
+      ctx.fillRect(pr.x - bw * 0.34, y - bh * 1.55, bw * 0.68, bh * 0.33);
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = Math.max(1, bh * 0.035);
+      ctx.strokeRect(pr.x - bw * 0.34, y - bh * 1.55, bw * 0.68, bh * 0.33);
+
+      const label =
+        p.type === "Gas Station" ? "GAS" :
+        p.type === "Garage" ? "GARAGE" :
+        p.type === "Diner" ? "DINER" : "BAR";
+      ctx.fillStyle = "#fff9bd";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = `900 ${Math.max(8, bh * 0.17)}px system-ui`;
+      ctx.fillText(label, pr.x, y - bh * 1.38);
+
+      if (dz < 150) {
+        ctx.font = `700 ${Math.max(9, bh * 0.11)}px system-ui`;
+        ctx.fillStyle = "#fff";
+        ctx.fillText(p.name, pr.x, y - bh * 1.72);
+      }
+
+      ctx.restore();
+    }
+  }
+
+  function drawTrafficCar(c) {
+    const dz = c.z - player.z;
+    const pr = project(c.x, dz);
+    const f = Math.min(W * 0.92, 920);
+    const ww = Math.max(8, c.w * 1.9 * f / dz);
+    const hh = Math.max(8, (c.h * 3.2 + c.l * 0.1) * f / dz);
+
+    ctx.save();
+    ctx.translate(pr.x, pr.y);
+    if (c.totaled) ctx.rotate(c.crush);
+
+    ctx.fillStyle = "rgba(0,0,0,0.42)";
+    ctx.beginPath();
+    ctx.ellipse(0, 2, ww * 0.58, Math.max(2, hh * 0.16), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = c.totaled ? "#555" : c.color;
+    ctx.fillRect(-ww/2, -hh, ww, hh * 0.72);
+
+    ctx.fillStyle = c.totaled ? "#333" : "rgba(170,220,255,0.78)";
+    ctx.fillRect(-ww * 0.33, -hh * 0.86, ww * 0.66, hh * 0.26);
+
+    ctx.fillStyle = "#151515";
+    ctx.fillRect(-ww * 0.47, -hh * 0.18, ww * 0.18, hh * 0.18);
+    ctx.fillRect( ww * 0.29, -hh * 0.18, ww * 0.18, hh * 0.18);
+
+    ctx.fillStyle = c.totaled ? "#ff8844" : "#ff3333";
+    ctx.fillRect(-ww * 0.42, -hh * 0.06, ww * 0.16, hh * 0.05);
+    ctx.fillRect( ww * 0.26, -hh * 0.06, ww * 0.16, hh * 0.05);
+
+    if (!c.totaled && dz < 130) {
+      const barW = ww * 0.8;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(-barW/2, -hh - 8, barW, 4);
+      ctx.fillStyle = "#ff5555";
+      ctx.fillRect(-barW/2, -hh - 8, barW * clamp(c.hp / c.maxHp, 0, 1), 4);
+    }
+
+    if (c.totaled) {
+      ctx.fillStyle = "rgba(40,40,40,0.35)";
+      for (let i = 0; i < 3; i++) {
+        const r = (Math.sin(c.smoke * 2 + i) + 1.5) * ww * 0.08;
+        ctx.beginPath();
+        ctx.arc(-ww * 0.1 + i * ww * 0.13, -hh - r - i * 5, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function drawPlayerTruck() {
+    const s = Math.min(1.05, Math.max(0.72, Math.min(W / 920, H / 680)));
+    const baseY = H * 0.79;
+    const truckW = 106 * s;
+    const truckH = 142 * s;
+    const cx = W / 2;
+    const steerTilt =
+      ((keys.KeyD || keys.ArrowRight) ? 1 : 0) -
+      ((keys.KeyA || keys.ArrowLeft) ? 1 : 0);
+
+    ctx.save();
+
+    for (let i = player.attached.length - 1; i >= 0; i--) {
+      const a = player.attached[i];
+      const y = baseY + 38 * s + i * 38 * s;
+      const w = 88 * s;
+      const h = 35 * s;
+
+      ctx.strokeStyle = "#222";
+      ctx.lineWidth = 5 * s;
+      ctx.beginPath();
+      ctx.moveTo(cx, baseY - 10 * s);
+      ctx.lineTo(cx, y - h * 0.5);
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(0,0,0,0.42)";
+      ctx.beginPath();
+      ctx.ellipse(cx, y + h * 0.5, w * 0.58, h * 0.30, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.translate(cx, y);
+      ctx.rotate((i - 1) * 0.05 + Math.sin(performance.now()/230 + i) * 0.025);
+      ctx.fillStyle = a.color;
+      ctx.fillRect(-w/2, -h/2, w, h);
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(-w*0.32, -h*0.32, w*0.64, h*0.18);
+      ctx.fillStyle = "#222";
+      ctx.fillRect(-w*0.46, h*0.18, w*0.17, h*0.22);
+      ctx.fillRect( w*0.29, h*0.18, w*0.17, h*0.22);
+      ctx.restore();
+    }
+
+    ctx.translate(cx, baseY);
+    ctx.rotate(steerTilt * 0.025);
+
+    ctx.fillStyle = "rgba(0,0,0,0.48)";
+    ctx.beginPath();
+    ctx.ellipse(0, truckH * 0.08, truckW * 0.62, truckH * 0.20, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(-truckW * 0.55, -truckH * 0.20, truckW * 0.18, truckH * 0.25);
+    ctx.fillRect( truckW * 0.37, -truckH * 0.20, truckW * 0.18, truckH * 0.25);
+    ctx.fillRect(-truckW * 0.55, -truckH * 0.85, truckW * 0.18, truckH * 0.25);
+    ctx.fillRect( truckW * 0.37, -truckH * 0.85, truckW * 0.18, truckH * 0.25);
+
+    ctx.fillStyle = "#ffd21f";
+    ctx.fillRect(-truckW/2, -truckH, truckW, truckH * 0.92);
+
+    ctx.fillStyle = "#cc9a09";
+    ctx.fillRect(-truckW * 0.45, -truckH * 0.26, truckW * 0.90, truckH * 0.28);
+
+    ctx.fillStyle = "#111";
+    ctx.fillRect(-truckW * 0.35, -truckH * 0.88, truckW * 0.70, truckH * 0.22);
+    ctx.fillStyle = "#7ed7ff";
+    ctx.fillRect(-truckW * 0.30, -truckH * 0.84, truckW * 0.60, truckH * 0.15);
+
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 7 * s;
+    ctx.beginPath();
+    ctx.moveTo(0, -truckH * 0.36);
+    ctx.lineTo(0, -truckH * 0.58);
+    ctx.lineTo(truckW * 0.36, -truckH * 0.43);
+    ctx.stroke();
+
+    ctx.fillStyle = "#222";
+    ctx.beginPath();
+    ctx.arc(truckW * 0.39, -truckH * 0.42, 5 * s, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#111";
+    ctx.font = `900 ${18*s}px system-ui`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("REPO", 0, -truckH * 0.13);
+
+    ctx.fillStyle = "#fffa9b";
+    ctx.fillRect(-truckW * 0.42, -truckH * 0.62, truckW * 0.16, truckH * 0.06);
+    ctx.fillRect( truckW * 0.26, -truckH * 0.62, truckW * 0.16, truckH * 0.06);
+
+    ctx.restore();
+  }
+
+  function drawBar(x, y, w, h, label, value, max, color) {
+    const pct = clamp(value / max, 0, 1);
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w * pct, h);
+    ctx.strokeStyle = "rgba(255,255,255,0.45)";
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 13px system-ui";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${label}: ${Math.ceil(value)}/${Math.ceil(max)}`, x + 8, y + h / 2);
+  }
+
+  function drawHUD() {
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(12, 12, 330, 132);
+
+    ctx.fillStyle = "#ffe36d";
+    ctx.font = "900 22px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText("Daniel Catches the Car", 22, 38);
+
+    drawBar(22, 52, 230, 18, "Food", player.food, 100, "#ff9e42");
+    drawBar(22, 76, 230, 18, "Drink", player.drink, 100, "#42b9ff");
+    drawBar(22, 100, 230, 18, "Gas", player.gas, player.maxGas, "#62ee67");
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "800 16px system-ui";
+    ctx.fillText(`Money: ${money(player.money)}`, 265, 65);
+    ctx.fillText(`Speed: ${Math.max(0, Math.round(player.speed))}`, 265, 91);
+    ctx.fillText(`Cars: ${player.attached.length}/3`, 265, 117);
+
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(W - 320, 12, 305, 94);
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 13px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText(`Tank ${roman(player.tank)} | Turbo ${roman(player.turbo)} | Armor ${roman(player.armor)}`, W - 306, 36);
+    ctx.fillText(`Mini freezer: ${player.freezer ? "YES" : "NO"}  Food ${player.foodPacks}/${freezerCap()}  Drink ${player.drinkPacks}/${freezerCap()}`, W - 306, 58);
+    ctx.fillStyle = "#d9e7ff";
+    ctx.fillText("WASD drive | Space/Shift ram | T hook | E stop | F freezer", W - 306, 84);
+
+    let prompt = "";
+    if (state === "playing") {
+      const tow = getTowableCar();
+      if (tow) {
+        prompt = player.attached.length >= 3 ? "Tow rig full. Find a garage." : `Press T to hook totaled ${tow.name} worth ${money(tow.value)}`;
+      } else {
+        const p = getNearbyPlace(65);
+        if (p) {
+          if (Math.abs(player.x - p.stopX) > 5.2) {
+            prompt = `${p.name}: pull onto the ${p.side < 0 ? "left" : "right"} shoulder`;
+          } else if (Math.abs(player.speed) > 7.5) {
+            prompt = `${p.name}: slow down to stop`;
+          } else {
+            prompt = `Press E to enter ${p.name} (${p.type})`;
+          }
+        }
+      }
+    }
+
+    if (prompt) {
+      ctx.fillStyle = "rgba(0,0,0,0.58)";
+      ctx.fillRect(W/2 - 300, H - 88, 600, 40);
+      ctx.fillStyle = "#fff3a1";
+      ctx.font = "900 18px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(prompt, W/2, H - 68);
+    }
+
+    let y = H - 144;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      const a = clamp(m.life / 0.8, 0, 1);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(W/2 - 270, y - 18, 540, 26);
+      ctx.fillStyle = m.color;
+      ctx.font = "800 15px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(m.text, W/2, y - 5);
+      y -= 30;
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  function drawShop() {
+    const p = currentShop;
+    if (!p) return;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.72)";
+    ctx.fillRect(0,0,W,H);
+
+    const boxW = Math.min(720, W - 40);
+    const boxH = Math.min(520, H - 50);
+    const x = W/2 - boxW/2;
+    const y = H/2 - boxH/2;
+
+    ctx.fillStyle = "#151923";
+    ctx.fillRect(x, y, boxW, boxH);
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(x, y, boxW, boxH);
+
+    ctx.fillStyle = p.color;
+    ctx.font = "900 32px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(`${p.name}`, W/2, y + 22);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 17px system-ui";
+    ctx.fillText(`${p.type}   |   Money ${money(player.money)}   |   E/Esc to leave`, W/2, y + 64);
+
+    const lines = [];
+
+    if (p.type === "Diner") {
+      lines.push("[1] Diner plate: +38 food — $22");
+      lines.push("[2] Coffee and water: +34 drink — $18");
+      lines.push("[3] Combo: +48 food, +42 drink — $55");
+      lines.push("[4] Freezer kit: +1 food pack, +1 drink pack — $58");
+    }
+
+    if (p.type === "Bar") {
+      lines.push("[1] Questionable bar food: +30 food — $34");
+      lines.push("[2] Rehydrate: +38 drink — $16");
+      lines.push("[3] Bar combo: +38 food, +48 drink — $62");
+      lines.push("[4] Freezer kit: +1 food pack, +1 drink pack — $64");
+    }
+
+    if (p.type === "Gas Station") {
+      const fillCost = Math.ceil((player.maxGas - player.gas) * 3.25);
+      lines.push("[1] Buy 25 gas — $86");
+      lines.push(`[2] Fill tank — ${money(fillCost)}`);
+      lines.push("[3] Panic burger: +24 food — $45");
+      lines.push("[4] Overpriced water: +25 drink — $40");
+      lines.push("[5] Expensive freezer kit — $90");
+    }
+
+    if (p.type === "Garage") {
+      const payout = player.attached.reduce((s,c) => s + c.value, 0);
+      lines.push(`[1] Drop attached cars: ${player.attached.length}/3 — payout ${money(payout)}`);
+      lines.push(`[2] Bigger gas tank Stage ${roman(player.tank + 1)} — ${player.tank < 3 ? money(tankCosts[player.tank]) : "MAX"}`);
+      lines.push(`[3] Turbo Stage ${roman(player.turbo + 1)} — ${player.turbo < 3 ? money(turboCosts[player.turbo]) : "MAX"}`);
+      lines.push(`[4] Mini freezer — ${player.freezer ? "INSTALLED" : money(freezerCost)}`);
+      lines.push(`[5] Armor Stage ${roman(player.armor + 1)} — ${player.armor < 3 ? money(armorCosts[player.armor]) : "MAX"}`);
+    }
+
+    ctx.textAlign = "left";
+    ctx.font = "800 22px system-ui";
+    let yy = y + 128;
+    for (const line of lines) {
+      ctx.fillStyle = "#eaf1ff";
+      ctx.fillText(line, x + 52, yy);
+      yy += 44;
+    }
+
+    ctx.fillStyle = "#ffd86b";
+    ctx.font = "700 16px system-ui";
+    ctx.fillText("Resources still tick down while Daniel wastes time deciding.", x + 52, y + boxH - 58);
+
+    ctx.fillStyle = "#b9c7e8";
+    ctx.font = "700 15px system-ui";
+    ctx.fillText(`Food ${Math.ceil(player.food)}/100 | Drink ${Math.ceil(player.drink)}/100 | Gas ${Math.ceil(player.gas)}/${player.maxGas}`, x + 52, y + boxH - 30);
+
+    ctx.restore();
+  }
+
+  function drawGameOver() {
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    ctx.fillRect(0,0,W,H);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.fillStyle = "#ff4242";
+    ctx.font = `900 ${Math.min(84, W/8)}px system-ui`;
+    ctx.fillText("WTF DANIEL", W/2, H/2 - 70);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "900 28px system-ui";
+    ctx.fillText(player.gameOverReason || "GAME OVER", W/2, H/2 + 10);
+
+    ctx.fillStyle = "#ffe36d";
+    ctx.font = "800 20px system-ui";
+    ctx.fillText(`Money: ${money(player.money)}    Distance: ${Math.floor(player.z)}m`, W/2, H/2 + 52);
+
+    ctx.fillStyle = "#cbd6ff";
+    ctx.font = "700 18px system-ui";
+    ctx.fillText("Press R to restart", W/2, H/2 + 102);
+
+    ctx.restore();
+  }
+
+  function drawIntro() {
+    ctx.clearRect(0,0,W,H);
+
+    const bg = ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0, "#10172d");
+    bg.addColorStop(1, "#2b1c25");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0,0,W,H);
+
+    ctx.fillStyle = "#47312c";
+    ctx.fillRect(0, H*0.68, W, H*0.32);
+
+    ctx.fillStyle = "#1b2137";
+    ctx.fillRect(W*0.08, H*0.18, W*0.34, H*0.12);
+    ctx.fillStyle = "#ffe18b";
+    ctx.fillRect(W*0.11, H*0.21, W*0.08, H*0.06);
+
+    const bedX = W*0.52;
+    const bedY = H*0.53;
+    const bedW = Math.min(330, W*0.36);
+    const bedH = Math.min(170, H*0.23);
+
+    ctx.fillStyle = "#36263e";
+    ctx.fillRect(bedX - bedW/2, bedY - bedH/2, bedW, bedH);
+    ctx.fillStyle = "#7d8cff";
+    ctx.fillRect(bedX - bedW/2 + 15, bedY - bedH/2 + 20, bedW - 30, bedH - 30);
+    ctx.fillStyle = "#dce6ff";
+    ctx.fillRect(bedX - bedW/2 + 25, bedY - bedH/2 + 28, bedW*0.32, bedH*0.28);
+
+    drawDog(bedX + bedW*0.19, bedY - bedH*0.09, Math.min(1.2, W/900));
+
+    const danielOut = introStep >= 1;
+    if (!danielOut) {
+      drawDaniel(bedX - bedW*0.17, bedY - bedH*0.13, 0.75, true);
+    } else {
+      drawDaniel(W*0.36, H*0.61, 1.0, false);
+    }
+
+    const keyX = W*0.31;
+    const keyY = H*0.50;
+    ctx.fillStyle = "#6d4b2c";
+    ctx.fillRect(keyX - 45, keyY + 28, 90, 50);
+
+    const hasKeys = introStep >= 2;
+    if (!hasKeys) {
+      drawKeys(keyX, keyY, 1);
+    } else {
+      drawKeys(W*0.36 + 42, H*0.56, 0.8);
+    }
+
+    ctx.fillStyle = "#ffe36d";
+    ctx.font = `900 ${Math.min(54, W/12)}px system-ui`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("Daniel Catches the Car", W/2, 34);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = `800 ${Math.min(24, W/30)}px system-ui`;
+    let line1, line2;
+    if (introStep === 0) {
+      line1 = "Daniel wakes up still hungover.";
+      line2 = "His dog refuses to leave the bed.";
+    } else if (introStep === 1) {
+      line1 = "Daniel gets out of bed and spots the keys.";
+      line2 = "The repo truck waits outside.";
+    } else {
+      line1 = "Keys acquired. Bad decisions authorized.";
+      line2 = "Go ram cars, hook wrecks, and make money.";
+    }
+    ctx.fillText(line1, W/2, H - 126);
+    ctx.fillStyle = "#cbd6ff";
+    ctx.fillText(line2, W/2, H - 92);
+
+    ctx.fillStyle = "#8eff8a";
+    ctx.font = "900 18px system-ui";
+    ctx.fillText(introStep < 2 ? "Press Space / Enter / Click to continue" : "Press Space / Enter / Click to start", W/2, H - 44);
+  }
+
+  function drawDaniel(x, y, s, lying) {
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.scale(s,s);
+    if (lying) ctx.rotate(-0.08);
+
+    ctx.fillStyle = "#f2c197";
+    ctx.beginPath();
+    ctx.arc(0, -46, 20, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = "#45261b";
+    ctx.fillRect(-18, -67, 36, 12);
+
+    ctx.fillStyle = "#111";
+    ctx.beginPath();
+    ctx.arc(-7, -48, 2.2, 0, Math.PI*2);
+    ctx.arc(7, -48, 2.2, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#7b2b2b";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-6, -37);
+    ctx.lineTo(6, -35);
+    ctx.stroke();
+
+    ctx.fillStyle = "#e0e0e0";
+    ctx.fillRect(-20, -26, 40, 55);
+
+    ctx.fillStyle = "#2f65c8";
+    ctx.fillRect(-18, 24, 15, 48);
+    ctx.fillRect(3, 24, 15, 48);
+
+    ctx.strokeStyle = "#f2c197";
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(-18, -12);
+    ctx.lineTo(-42, 10);
+    ctx.moveTo(18, -12);
+    ctx.lineTo(42, 10);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawDog(x, y, s) {
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.scale(s,s);
+    ctx.fillStyle = "#8b5a32";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 48, 26, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-36, -8, 18, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = "#5a351d";
+    ctx.beginPath();
+    ctx.ellipse(-48, -3, 10, 18, -0.3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = "#111";
+    ctx.beginPath();
+    ctx.arc(-42, -11, 2.4, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = "#5a351d";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(39, -4, 18, -1.4, 0.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawKeys(x, y, s) {
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.scale(s,s);
+    ctx.strokeStyle = "#ffdb58";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(-12, 0, 12, 0, Math.PI*2);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(42, 0);
+    ctx.moveTo(30, 0);
+    ctx.lineTo(30, 12);
+    ctx.moveTo(39, 0);
+    ctx.lineTo(39, 9);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255,255,160,0.8)";
+    ctx.beginPath();
+    ctx.moveTo(54, -16);
+    ctx.lineTo(60, -2);
+    ctx.lineTo(74, 4);
+    ctx.lineTo(60, 10);
+    ctx.lineTo(54, 24);
+    ctx.lineTo(48, 10);
+    ctx.lineTo(34, 4);
+    ctx.lineTo(48, -2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function update(dt) {
+    for (const m of messages) m.life -= dt;
+    messages = messages.filter(m => m.life > 0);
+
+    if (state === "playing") {
+      updatePlaying(dt);
+    } else if (state === "shop") {
+      updateNeeds(dt);
+      player.speed *= Math.pow(0.4, dt);
+      checkGameOver();
+    }
+  }
+
+  function loop(t) {
+    const dt = Math.min(0.05, Math.max(0, (t - last) / 1000));
+    last = t;
+
+    if (state === "playing" || state === "shop") update(dt);
+
+    if (state === "intro") drawIntro();
+    else renderWorld();
+
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

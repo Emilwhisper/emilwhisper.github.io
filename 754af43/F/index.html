@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Daniel Catches the Car</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: 'Courier New', monospace; background: #000; color: #fff; }
+  canvas { display: block; }
+  #hud { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; min-width: 220px; }
+  .bar { width: 200px; height: 18px; background: #222; border: 1px solid #666; margin: 3px 0; position: relative; }
+  .fill { height: 100%; transition: width 0.2s; }
+  .label { font-size: 12px; margin-top: 6px; }
+  #prompt { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 8px; font-size: 20px; color: yellow; z-index: 10; display:none; }
+  #controls { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 10px; font-size: 12px; z-index: 10; }
+  .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .overlay h1 { font-size: 60px; color: #ffcc00; text-shadow: 3px 3px 0 #000; margin: 10px; }
+  button { padding: 12px 24px; margin: 5px; font-size: 16px; cursor: pointer; background: #ffcc00; color: #000; border: none; border-radius: 4px; font-weight: bold; }
+  button:hover { background: #ffdd44; }
+  button:disabled { background: #666; color: #ccc; cursor: not-allowed; }
+  #shop { background: rgba(20,20,30,0.95); padding: 30px; border-radius: 10px; min-width: 400px; max-width: 600px; }
+  .shopItem { display: flex; justify-content: space-between; align-items: center; padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.05); border-radius: 4px; }
+  #introCanvas { border: 2px solid #ffcc00; margin: 20px; }
+  #introText { font-size: 20px; max-width: 600px; margin: 10px; min-height: 60px; }
+  #msg { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); font-size: 30px; color: #ffcc00; text-shadow: 2px 2px 0 #000; z-index: 15; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div id="hud" style="display:none">
+  <div style="font-size:18px;color:#ffcc00">💰 $<span id="money">0</span></div>
+  <div class="label">🍔 Food</div><div class="bar"><div class="fill" id="foodBar" style="background:#e74c3c;width:100%"></div></div>
+  <div class="label">🥤 Drink</div><div class="bar"><div class="fill" id="drinkBar" style="background:#3498db;width:100%"></div></div>
+  <div class="label">⛽ Gas</div><div class="bar"><div class="fill" id="gasBar" style="background:#f39c12;width:100%"></div></div>
+  <div class="label">🏎️ Speed: <span id="speed">0</span> mph</div>
+  <div class="label">🚗 Attached: <span id="attached">0</span>/3</div>
+  <div class="label">🧊 Freezer: <span id="freezerStatus">None</span></div>
+</div>
+
+<div id="prompt"></div>
+<div id="msg"></div>
+
+<div id="controls" style="display:none">
+  WASD / Arrows - Drive<br>
+  Space - Brake<br>
+  E - Enter shop<br>
+  F - Attach totaled car<br>
+  G - Drop food from freezer<br>
+  R - Detach last car
+</div>
+
+<div id="intro" class="overlay">
+  <h1>Daniel Catches the Car</h1>
+  <canvas id="introCanvas" width="640" height="360"></canvas>
+  <div id="introText">Daniel wakes up... his head is pounding. His dog is still snoring on the bed.</div>
+  <button id="startBtn" onclick="startGame()">Grab Keys & Drive</button>
+</div>
+
+<div id="gameover" class="overlay" style="display:none">
+  <h1>WTF Daniel</h1>
+  <p id="gameoverReason" style="font-size:24px;margin:20px"></p>
+  <p>Money earned: $<span id="finalMoney">0</span></p>
+  <button onclick="location.reload()">Try Again</button>
+</div>
+
+<div id="shopOverlay" class="overlay" style="display:none">
+  <div id="shop">
+    <h2 id="shopTitle" style="color:#ffcc00"></h2>
+    <div id="shopContent"></div>
+    <button onclick="closeShop()">Leave</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/three@0.150.0/build/three.min.js"></script>
+<script>
+// ============================================================
+// DANIEL CATCHES THE CAR - full game
+// ============================================================
+
+let scene, camera, renderer, clock;
+let truck, ground;
+let cars = [];         // enemy cars on road
+let attachedCars = []; // cars hooked to truck
+let buildings = [];    // roadside stops
+let trees = [];
+let keys = {};
+let gameState = 'intro';
+let msgTimer = 0;
+
+const state = {
+  money: 0,
+  food: 100,
+  drink: 100,
+  gas: 100,
+  maxGas: 100,
+  speed: 0,
+  gasLevel: 0,     // 0-3
+  turboLevel: 0,   // 0-3
+  armorLevel: 0,   // 0-3
+  freezer: false,
+  freezerInv: [],  // stored food items
+};
+
+const CAR_TYPES = [
+  { name: 'Sedan',   color: 0x3498db, value: 400,  health: 3, size:[1.8,1.2,4.0] },
+  { name: 'SUV',     color: 0x27ae60, value: 700,  health: 5, size:[2.0,1.6,4.6] },
+  { name: 'Sports',  color: 0xe74c3c, value: 1800, health: 2, size:[1.8,1.0,4.3] },
+  { name: 'Truck',   color: 0x8b5a2b, value: 1200, health: 8, size:[2.2,1.9,5.4] },
+  { name: 'Luxury',  color: 0x1a1a2e, value: 3500, health: 4, size:[1.9,1.3,4.9] },
+  { name: 'Beater',  color: 0x999999, value: 150,  health: 2, size:[1.7,1.4,3.8] },
+];
+
+// ============================================================
+// INTRO SCENE
+// ============================================================
+function playIntro() {
+  const canvas = document.getElementById('introCanvas');
+  const iRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  const iScene = new THREE.Scene();
+  iScene.background = new THREE.Color(0x201530);
+  const iCam = new THREE.PerspectiveCamera(50, 640/360, 0.1, 100);
+
+  iScene.add(new THREE.AmbientLight(0x8888aa, 0.6));
+  const lamp = new THREE.PointLight(0xffcc88, 1.5, 20);
+  lamp.position.set(3, 4, 2);
+  iScene.add(lamp);
+
+  // Floor
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(15,15), new THREE.MeshLambertMaterial({color:0x553322}));
+  floor.rotation.x = -Math.PI/2;
+  iScene.add(floor);
+  // Wall
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(15,8), new THREE.MeshLambertMaterial({color:0x334455}));
+  wall.position.set(0,4,-5); iScene.add(wall);
+
+  // Bed
+  const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(3.2,0.4,4.2), new THREE.MeshLambertMaterial({color:0x5a3820}));
+  bedFrame.position.set(-2,0.2,0); iScene.add(bedFrame);
+  const mattress = new THREE.Mesh(new THREE.BoxGeometry(3,0.4,4), new THREE.MeshLambertMaterial({color:0xf0e0d0}));
+  mattress.position.set(-2,0.6,0); iScene.add(mattress);
+  const pillow = new THREE.Mesh(new THREE.BoxGeometry(2.6,0.2,0.8), new THREE.MeshLambertMaterial({color:0xffffff}));
+  pillow.position.set(-2,0.9,-1.4); iScene.add(pillow);
+  const blanket = new THREE.Mesh(new THREE.BoxGeometry(3.05,0.15,2.5), new THREE.MeshLambertMaterial({color:0x884422}));
+  blanket.position.set(-2,0.9,0.6); iScene.add(blanket);
+
+  // Daniel (starts in bed)
+  const daniel = new THREE.Group();
+  const dHead = new THREE.Mesh(new THREE.SphereGeometry(0.32,16,16), new THREE.MeshLambertMaterial({color:0xf5c99b}));
+  dHead.position.y = 0.3; daniel.add(dHead);
+  const dHair = new THREE.Mesh(new THREE.SphereGeometry(0.34,16,16,0,Math.PI*2,0,Math.PI/2), new THREE.MeshLambertMaterial({color:0x3a2818}));
+  dHair.position.y = 0.3; daniel.add(dHair);
+  const dBody = new THREE.Mesh(new THREE.BoxGeometry(0.8,1,0.5), new THREE.MeshLambertMaterial({color:0x2255aa}));
+  dBody.position.y = -0.4; daniel.add(dBody);
+  daniel.position.set(-2,0.95,-0.8);
+  daniel.rotation.x = -Math.PI/2 + 0.3; // lying down
+  iScene.add(daniel);
+
+  // Dog
+  const dog = new THREE.Group();
+  const dogBody = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.35,0.9), new THREE.MeshLambertMaterial({color:0x8b5a2b}));
+  dog.add(dogBody);
+  const dogHead = new THREE.Mesh(new THREE.SphereGeometry(0.22,12,12), new THREE.MeshLambertMaterial({color:0x8b5a2b}));
+  dogHead.position.set(0,0.15,0.5); dog.add(dogHead);
+  const ear1 = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.2,8), new THREE.MeshLambertMaterial({color:0x5a3820}));
+  ear1.position.set(-0.12,0.32,0.5); dog.add(ear1);
+  const ear2 = ear1.clone(); ear2.position.x = 0.12; dog.add(ear2);
+  dog.position.set(-2,1.15,1.5); iScene.add(dog);
+
+  // Nightstand + keys
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(1,1.2,0.8), new THREE.MeshLambertMaterial({color:0x654321}));
+  stand.position.set(2.2,0.6,-0.5); iScene.add(stand);
+  const keysMesh = new THREE.Group();
+  const kRing = new THREE.Mesh(new THREE.TorusGeometry(0.08,0.02,8,16), new THREE.MeshLambertMaterial({color:0xcccccc, emissive:0x666666}));
+  keysMesh.add(kRing);
+  const kKey = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.02,0.06), new THREE.MeshLambertMaterial({color:0xffdd44, emissive:0x664400}));
+  kKey.position.set(0.12,0,0); keysMesh.add(kKey);
+  keysMesh.position.set(2.2,1.3,-0.5); iScene.add(keysMesh);
+
+  // Lamp
+  const lampShade = new THREE.Mesh(new THREE.ConeGeometry(0.3,0.4,12), new THREE.MeshLambertMaterial({color:0xffddaa, emissive:0x664422}));
+  lampShade.position.set(2.5,1.6,-0.5); iScene.add(lampShade);
+
+  // Beer bottles on floor
+  for (let i=0; i<5; i++) {
+    const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.3,8), new THREE.MeshLambertMaterial({color:0x225500}));
+    bottle.position.set(-4+Math.random()*3, 0.15, -2+Math.random()*3);
+    bottle.rotation.z = Math.PI/2;
+    iScene.add(bottle);
+  }
+
+  let t = 0, stage = 0;
+  const texts = [
+    "Daniel wakes up... his head is pounding. His dog is still snoring on the bed.",
+    "Ugh... last night was rough. Where are those car keys?",
+    "There they are! Time to hit the highway and repo some cars.",
+    "The dog rolls over. Daniel grabs the keys and heads out."
+  ];
+
+  function animateIntro() {
+    if (gameState !== 'intro') { iRenderer.dispose(); return; }
+    requestAnimationFrame(animateIntro);
+    t += 0.016;
+
+    // Camera orbit
+    const a = 0.3 + t * 0.15;
+    iCam.position.set(Math.cos(a)*7, 3 + Math.sin(t*0.4)*0.3, Math.sin(a)*7);
+    iCam.lookAt(0, 1, 0);
+
+    // Stage progression
+    const newStage = Math.min(3, Math.floor(t / 3));
+    if (newStage !== stage) {
+      stage = newStage;
+      document.getElementById('introText').innerText = texts[stage];
+      if (stage >= 1) { // Daniel sits up
+        daniel.rotation.x = -Math.PI/4;
+        daniel.position.z = -0.4;
+      }
+      if (stage >= 2) { // Daniel stands
+        daniel.rotation.x = 0;
+        daniel.position.set(0, 0.9, 0);
+      }
+      if (stage >= 3) { // Daniel by keys
+        daniel.position.set(1.5, 0.9, -0.5);
+        keysMesh.visible = false;
+      }
+    }
+
+    keysMesh.rotation.y += 0.05;
+    keysMesh.position.y = 1.3 + Math.sin(t*3)*0.05;
+    // Dog "breathing"
+    dog.scale.y = 1 + Math.sin(t*2)*0.05;
+
+    iRenderer.render(iScene, iCam);
+  }
+  animateIntro();
+}
+
+// ============================================================
+// MAIN GAME INITIALIZATION
+// ============================================================
+function initGame() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb);
+  scene.fog = new THREE.Fog(0x87ceeb, 60, 250);
+
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 500);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // Lighting
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+  sun.position.set(60, 100, 40);
+  scene.add(sun);
+
+  // Ground (huge plane)
+  ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(600, 4000),
+    new THREE.MeshLambertMaterial({ color: 0x4a7c3a })
+  );
+  ground.rotation.x = -Math.PI/2;
+  scene.add(ground);
+
+  // Road (long strip)
+  const road = new THREE.Mesh(
+    new THREE.PlaneGeometry(16, 4000),
+    new THREE.MeshLambertMaterial({ color: 0x333333 })
+  );
+  road.rotation.x = -Math.PI/2;
+  road.position.y = 0.01;
+  scene.add(road);
+
+  // Road markings (dashed line)
+  for (let i = -200; i < 200; i++) {
+    if (i % 2 !== 0) continue;
+    const dash = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.3, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffff44 })
+    );
+    dash.rotation.x = -Math.PI/2;
+    dash.position.set(0, 0.02, i*5);
+    scene.add(dash);
+  }
+  // Edge lines
+  for (let side of [-7.5, 7.5]) {
+    const edge = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.2, 4000),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    edge.rotation.x = -Math.PI/2;
+    edge.position.set(side, 0.02, 0);
+    scene.add(edge);
+  }
+
+  // Truck
+  truck = createTruck();
+  truck.position.set(0, 0, 0);
+  scene.add(truck);
+
+  // Initial spawns
+  for (let i = 0; i < 12; i++) spawnCar(50 + i * 30);
+  for (let i = 0; i < 8; i++) spawnBuilding(80 + i * 60);
+  for (let i = 0; i < 50; i++) spawnTree();
+
+  clock = new THREE.Clock();
+
+  // Input
+  window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (e.key.toLowerCase() === 'e') tryEnterShop();
+    if (e.key.toLowerCase() === 'f') tryAttachCar();
+    if (e.key.toLowerCase() === 'r') detachLastCar();
+    if (e.key.toLowerCase() === 'g') eatFromFreezer();
+  });
+  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  document.getElementById('controls').style.display = 'block';
+}
+
+// ============================================================
+// TRUCK MODEL
+// ============================================================
+function createTruck() {
+  const g = new THREE.Group();
+  const yellow = new THREE.MeshLambertMaterial({ color: 0xffcc00 });
+  const dark = new THREE.MeshLambertMaterial({ color: 0x222222 });
+  const glass = new THREE.MeshLambertMaterial({ color: 0x223344 });
+
+  // Chassis
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.4, 6), yellow);
+  chassis.position.y = 0.7;
+  g.add(chassis);
+
+  // Cab
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.5, 2), yellow);
+  cab.position.set(0, 1.75, 1.7);
+  g.add(cab);
+
+  // Windshield
+  const ws = new THREE.Mesh(new THREE.BoxGeometry(2.05, 1, 0.15), glass);
+  ws.position.set(0, 1.95, 2.55);
+  g.add(ws);
+
+  // Side windows
+  for (let s of [-1, 1]) {
+    const sw = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 1.6), glass);
+    sw.position.set(s*1.1, 1.9, 1.7);
+    g.add(sw);
+  }
+
+  // Flatbed (for cars)
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.2, 3.2), dark);
+  bed.position.set(0, 1.0, -1.1);
+  g.add(bed);
+
+  // Tow crane arm
+  const crane = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 2), dark);
+  crane.position.set(0, 1.6, -1.5);
+  g.add(crane);
+  const craneBase = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.4, 0.4), dark);
+  craneBase.position.set(0, 1.3, -0.4);
+  g.add(craneBase);
+  const hook = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshLambertMaterial({color:0x888888}));
+  hook.position.set(0, 1.3, -2.4);
+  g.add(hook);
+
+  // Bumper
+  const bumper = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 0.3), dark);
+  bumper.position.set(0, 0.6, 3.05);
+  g.add(bumper);
+
+  // Wheels
+  const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.4, 16);
+  const wheelMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+  const wheelPositions = [[-1.15, 0.55, 1.8],[1.15,0.55,1.8],[-1.15,0.55,-1.5],[1.15,0.55,-1.5]];
+  wheelPositions.forEach(p => {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI/2;
+    w.position.set(...p);
+    g.add(w);
+  });
+
+  // Headlights
+  for (let s of [-1, 1]) {
+    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.1), new THREE.MeshBasicMaterial({color:0xffffcc}));
+    hl.position.set(s*0.7, 1, 3.05);
+    g.add(hl);
+  }
+
+  // Logo
+  const logo = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.4, 0.05), new THREE.MeshBasicMaterial({color:0x000000}));
+  logo.position.set(0, 1.4, 2.75);
+  g.add(logo);
+
+  return g;
+}
+
+// ============================================================
+// ENEMY CAR SPAWNING
+// ============================================================
+function createCarMesh(type) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(type.size[0], type.size[1]*0.6, type.size[2]),
+    new THREE.MeshLambertMaterial({ color: type.color })
+  );
+  body.position.y = type.size[1]*0.3 + 0.4;
+  g.add(body);
+  const top = new THREE.Mesh(
+    new THREE.BoxGeometry(type.size[0]*0.85, type.size[1]*0.5, type.size[2]*0.55),
+    new THREE.MeshLambertMaterial({ color: type.color })
+  );
+  top.position.y = type.size[1]*0.9 + 0.4;
+  g.add(top);
+  // Windows
+  const win = new THREE.Mesh(
+    new THREE.BoxGeometry(type.size[0]*0.83, type.size[1]*0.4, type.size[2]*0.53),
+    new THREE.MeshLambertMaterial({ color: 0x223344 })
+  );
+  win.position.y = type.size[1]*0.9 + 0.4;
+  g.add(win);
+  // Wheels
+  const wGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12);
+  const wMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+  [[-1,1],[1,1],[-1,-1],[1,-1]].forEach(([sx,sz]) => {
+    const w = new THREE.Mesh(wGeo, wMat);
+    w.rotation.z = Math.PI/2;
+    w.position.set(sx * type.size[0]/2 * 0.9, 0.35, sz * type.size[2]/2 * 0.7);
+    g.add(w);
+  });
+  return g;
+}
+
+function spawnCar(zOffset) {
+  const type = CAR_TYPES[Math.floor(Math.random() * CAR_TYPES.length)];
+  const mesh = createCarMesh(type);
+  const lane = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random()*3);
+  const z = truck.position.z + zOffset + Math.random()*20;
+  mesh.position.set(lane, 0, z);
+  mesh.rotation.y = Math.random() < 0.9 ? 0 : Math.PI; // most go same way
+  scene.add(mesh);
+  cars.push({
+    mesh, type,
+    health: type.health,
+    maxHealth: type.health,
+    speed: 5 + Math.random()*8,
+    totaled: false,
+    lane,
+  });
+}
+
+function spawnTree() {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 2, 8), new THREE.MeshLambertMaterial({color:0x5a3820}));
+  trunk.position.y = 1;
+  g.add(trunk);
+  const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.5, 3, 8), new THREE.MeshLambertMaterial({color:0x2d5a2d}));
+  leaves.position.y = 3;
+  g.add(leaves);
+  g.position.set(side * (15 + Math.random()*40), 0, truck.position.z + (Math.random()-0.3)*300);
+  scene.add(g);
+  trees.push(g);
+}
+
+// ============================================================
+// BUILDINGS / STOPS
+// ============================================================
+function spawnBuilding(zOffset) {
+  const types = ['bar','diner','garage','gas'];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const g = new THREE.Group();
+
+  const config = {
+    bar:    { color: 0x8b0000, sign: '🍺 BAR',      signColor:'#ff6666' },
+    diner:  { color: 0xff9944, sign: '🍔 DINER',    signColor:'#ffcc44' },
+    garage: { color: 0x555555, sign: '🔧 GARAGE',   signColor:'#66ccff' },
+    gas:    { color: 0xffdd44, sign: '⛽ GAS',      signColor:'#ffffff' }
+  }[type];
+
+  // Building
+  const w = 8 + Math.random()*4, h = 4 + Math.random()*2, d = 8;
+  const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({color: config.color}));
+  b.position.y = h/2;
+  g.add(b);
+  // Roof
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(w+0.5, 0.3, d+0.5), new THREE.MeshLambertMaterial({color:0x333333}));
+  roof.position.y = h;
+  g.add(roof);
+  // Door
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.5, 0.1), new THREE.MeshLambertMaterial({color:0x442200}));
+  door.position.set(0, 1.25, d/2 + 0.05);
+  g.add(door);
+  // Sign
+  const canv = document.createElement('canvas');
+  canv.width = 256; canv.height = 64;
+  const ctx = canv.getContext('2d');
+  ctx.fillStyle = '#000'; ctx.fillRect(0,0,256,64);
+  ctx.fillStyle = config.signColor;
+  ctx.font = 'bold 36px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline='middle';
+  ctx.fillText(config.sign, 128, 32);
+  const tex = new THREE.CanvasTexture(canv);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(6,1.5), new THREE.MeshBasicMaterial({map:tex}));
+  sign.position.set(0, h + 1.5, d/2 + 0.1);
+  g.add(sign);
+  const signBack = new THREE.Mesh(new THREE.PlaneGeometry(6,1.5), new THREE.MeshBasicMaterial({map:tex}));
+  signBack.position.set(0, h + 1.5, d/2);
+  signBack.rotation.y = Math.PI;
+  g.add(signBack);
+  // Sign posts
+  for (let s of [-2.5, 2.5]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.5, 0.2), new THREE.MeshLambertMaterial({color:0x222222}));
+    post.position.set(s, h + 0.75, d/2 + 0.05);
+    g.add(post);
+  }
+
+  // Gas pumps for gas station
+  if (type === 'gas') {
+    for (let i = 0; i < 2; i++) {
+      const pump = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2, 0.8), new THREE.MeshLambertMaterial({color:0xdd0000}));
+      pump.position.set(-2 + i*4, 1, d/2 + 4);
+      g.add(pump);
+    }
+  }
+
+  g.position.set(side * 18, 0, truck.position.z + zOffset);
+  scene.add(g);
+  buildings.push({ mesh: g, type, x: g.position.x, z: g.position.z });
+}
+
+// ============================================================
+// SHOP / INTERACTION
+// ============================================================
+let nearBuilding = null;
+
+function tryEnterShop() {
+  if (nearBuilding && gameState === 'playing') openShop(nearBuilding);
+}
+
+function openShop(b) {
+  gameState = 'shop';
+  document.getElementById('shopOverlay').style.display = 'flex';
+  const title = { bar:'🍺 Roadside Bar', diner:'🍔 Highway Diner', garage:"🔧 Bob's Garage", gas:'⛽ Gas & Go' }[b.type];
+  document.getElementById('shopTitle').innerText = title;
+  renderShop(b);
+}
+
+function renderShop(b) {
+  const c = document.getElementById('shopContent');
+  let items = [];
+
+  if (b.type === 'bar') {
+    items = [
+      { name: '🍺 Cheap Beer',        cost: 15,  action: () => addDrink(30) },
+      { name: '🥃 Whiskey',           cost: 25,  action: () => { addDrink(50); addFood(10); } },
+      { name: '🍕 Bar Pizza',         cost: 20,  action: () => addFood(35) },
+      { name: '🍗 Wings',             cost: 30,  action: () => addFood(50) },
+    ];
+  } else if (b.type === 'diner') {
+    items = [
+      { name: '☕ Coffee',            cost: 8,   action: () => addDrink(25) },
+      { name: '🥞 Pancake Stack',    cost: 18,  action: () => addFood(45) },
+      { name: '🍔 Big Burger',       cost: 25,  action: () => addFood(70) },
+      { name: '🥤 Soda',              cost: 6,   action: () => addDrink(40) },
+      { name: '🍟 Fries',             cost: 10,  action: () => addFood(25) },
+    ];
+    if (state.freezer) {
+      items.push({ name: '❄️ Store: Frozen Burrito', cost: 30, action: () => storeFood('Burrito', 60) });
+      items.push({ name: '❄️ Store: Frozen Meatloaf', cost: 45, action: () => storeFood('Meatloaf', 90) });
+    }
+  } else if (b.type === 'gas') {
+    items = [
+      { name: '⛽ Fill Gas (per 10)', cost: 12,  action: () => addGas(10) },
+      { name: '⛽ Full Tank',         cost: Math.ceil((state.maxGas - state.gas) * 1.3), action: () => addGas(state.maxGas - state.gas) },
+      { name: '🌭 Sad Hot Dog',      cost: 25,  action: () => addFood(20) },
+      { name: '🥤 Overpriced Drink', cost: 20,  action: () => addDrink(30) },
+      { name: '🍫 Candy Bar',        cost: 15,  action: () => addFood(15) },
+    ];
+  } else if (b.type === 'garage') {
+    // Sell cars first
+    if (attachedCars.length > 0) {
+      const total = attachedCars.reduce((s,c) => s + c.type.value, 0);
+      items.push({ name: `💰 Sell ${attachedCars.length} car(s) for $${total}`, cost: 0, action: () => sellAllCars() });
+    }
+    // Upgrades
+    const gasUp = [800, 2000, 5000];
+    if (state.gasLevel < 3) items.push({
+      name: `⛽ Bigger Gas Tank (Lv ${state.gasLevel+1}/3)`,
+      cost: gasUp[state.gasLevel],
+      action: () => { state.gasLevel++; state.maxGas = 100 + state.gasLevel*80; state.gas = state.maxGas; }
+    });
+    const turboUp = [1200, 3000, 7000];
+    if (state.turboLevel < 3) items.push({
+      name: `🚀 Turbo (Lv ${state.turboLevel+1}/3)`,
+      cost: turboUp[state.turboLevel],
+      action: () => { state.turboLevel++; }
+    });
+    const armorUp = [1000, 2500, 6000];
+    if (state.armorLevel < 3) items.push({
+      name: `🛡️ Armor Plating (Lv ${state.armorLevel+1}/3)`,
+      cost: armorUp[state.armorLevel],
+      action: () => { state.armorLevel++; }
+    });
+    if (!state.freezer) items.push({
+      name: '🧊 Mini Freezer (store 5 frozen foods)',
+      cost: 1500,
+      action: () => { state.freezer = true; }
+    });
+    items.push({
+      name: '🔧 Emergency Repair Kit (+50 food, +50 drink)',
+      cost: 300,
+      action: () => { addFood(50); addDrink(50); }
+    });
+  }
+
+  c.innerHTML = '';
+  items.forEach(it => {
+    const div = document.createElement('div');
+    div.className = 'shopItem';
+    const canAfford = state.money >= it.cost;
+    div.innerHTML = `<span>${it.name}</span><button ${canAfford ? '' : 'disabled'}>$${it.cost}</button>`;
+    div.querySelector('button').onclick = () => {
+      if (state.money >= it.cost) {
+        state.money -= it.cost;
+        it.action();
+        renderShop(b);
+        updateHUD();
+      }
+    };
+    c.appendChild(div);
+  });
+
+  if (items.length === 0) {
+    c.innerHTML = '<p>Nothing to buy here right now.</p>';
+  }
+}
+
+function closeShop() {
+  document.getElementById('shopOverlay').style.display = 'none';
+  gameState = 'playing';
+}
+
+function sellAllCars() {
+  const total = attachedCars.reduce((s,c) => s + c.type.value, 0);
+  attachedCars.forEach(c => scene.remove(c.mesh));
+  attachedCars = [];
+  state.money += total;
+  showMsg(`+$${total}`);
+}
+
+function addFood(n) { state.food = Math.min(100, state.food + n); }
+function addDrink(n) { state.drink = Math.min(100, state.drink + n); }
+function addGas(n) { state.gas = Math.min(state.maxGas, state.gas + n); }
+
+function storeFood(name, value) {
+  if (state.freezerInv.length < 5) {
+    state.freezerInv.push({ name, value });
+    showMsg(`Stored ${name}`);
+  }
+}
+
+function eatFromFreezer() {
+  if (state.freezerInv.length > 0) {
+    const item = state.freezerInv.pop();
+    addFood(item.value);
+    showMsg(`Ate ${item.name}: +${item.value} food`);
+    updateHUD();
+  } else if (state.freezer) {
+    showMsg('Freezer is empty!');
+  }
+}
+
+// ============================================================
+// ATTACHMENT
+// ============================================================
+function tryAttachCar() {
+  if (attachedCars.length >= 3) { showMsg('Max 3 cars attached!'); return; }
+  // find nearest totaled car
+  let best = null, bestD = 8;
+  cars.forEach(c => {
+    if (!c.totaled) return;
+    const d = c.mesh.position.distanceTo(truck.position);
+    if (d < bestD) { bestD = d; best = c; }
+  });
+  if (best) {
+    attachedCars.push(best);
+    cars.splice(cars.indexOf(best), 1);
+    showMsg(`Hooked ${best.type.name}! Value: $${best.type.value}`);
+  }
+}
+
+function detachLastCar() {
+  if (attachedCars.length === 0) return;
+  const c = attachedCars.pop();
+  scene.remove(c.mesh);
+  showMsg('Detached car');
+}
+
+// ============================================================
+// UPDATE LOOP
+// ============================================================
+function updateTruck(dt) {
+  const turboBoost = state.turboLevel * 12;
+  const maxSpeed = 30 + turboBoost;
+  const accel = 18 + state.turboLevel * 6;
+  const dragFactor = 0.985;
+  const turnSpeed = 1.8;
+
+  let throttle = 0;
+  if (keys['w'] || keys['arrowup']) throttle = 1;
+  if (keys['s'] || keys['arrowdown']) throttle = -0.6;
+
+  if (keys[' ']) { state.speed *= 0.9; }
+
+  if (throttle !== 0 && state.gas > 0) {
+    state.speed += throttle * accel * dt;
+    state.gas -= Math.abs(state.speed) * dt * 0.015;
+  } else {
+    state.speed *= dragFactor;
+    if (Math.abs(state.speed) < 0.05) state.speed = 0;
+  }
+  state.speed = Math.max(-maxSpeed*0.4, Math.min(maxSpeed, state.speed));
+
+  // Turning
+  if (Math.abs(state.speed) > 0.3) {
+    let turn = 0;
+    if (keys['a'] || keys['arrowleft'])  turn = 1;
+    if (keys['d'] || keys['arrowright']) turn = -1;
+    truck.rotation.y += turn * turnSpeed * dt * Math.sign(state.speed) * Math.min(1, Math.abs(state.speed)/15);
+  }
+
+  // Move
+  const fwd = new THREE.Vector3(0, 0, 1).applyEuler(truck.rotation);
+  truck.position.add(fwd.clone().multiplyScalar(state.speed * dt));
+
+  // Camera behind truck
+  const camOffset = new THREE.Vector3(0, 5, -11).applyEuler(truck.rotation);
+  const targetPos = truck.position.clone().add(camOffset);
+  camera.position.lerp(targetPos, 0.12);
+  camera.lookAt(truck.position.x, truck.position.y + 1.5, truck.position.z);
+}
+
+function updateEnemyCars(dt) {
+  cars.forEach(c => {
+    if (!c.totaled) {
+      const dir = c.mesh.rotation.y > Math.PI/2 ? -1 : 1;
+      c.mesh.position.z += c.speed * dt * dir;
+    }
+  });
+  // Recycle far cars
+  for (let i = cars.length-1; i >= 0; i--) {
+    const c = cars[i];
+    const dz = c.mesh.position.z - truck.position.z;
+    if (dz < -100 || dz > 400) {
+      scene.remove(c.mesh);
+      cars.splice(i, 1);
+    }
+  }
+  // Spawn new
+  if (cars.length < 15 && Math.random() < 0.05) {
+    spawnCar(150 + Math.random()*100);
+  }
+}
+
+function updateBuildings() {
+  for (let i = buildings.length-1; i >= 0; i--) {
+    const b = buildings[i];
+    if (b.mesh.position.z - truck.position.z < -80) {
+      scene.remove(b.mesh);
+      buildings.splice(i, 1);
+    }
+  }
+  if (buildings.length < 8 && Math.random() < 0.02) {
+    spawnBuilding(200 + Math.random()*100);
+  }
+
+  // Detect nearby building
+  nearBuilding = null;
+  buildings.forEach(b => {
+    const dx = truck.position.x - b.x;
+    const dz = truck.position.z - b.z;
+    if (Math.abs(dx) < 20 && Math.abs(dz) < 12) nearBuilding = b;
+  });
+  const prompt = document.getElementById('prompt');
+  if (nearBuilding && gameState === 'playing') {
+    const label = { bar:'Bar', diner:'Diner', garage:'Garage', gas:'Gas Station' }[nearBuilding.type];
+    prompt.innerText = `Press E to enter ${label}`;
+    prompt.style.display = 'block';
+  } else {
+    prompt.style.display = 'none';
+  }
+}
+
+function updateTrees() {
+  for (let i = trees.length-1; i >= 0; i--) {
+    const t = trees[i];
+    if (t.position.z - truck.position.z < -80) {
+      scene.remove(t);
+      trees.splice(i, 1);
+    }
+  }
+  if (trees.length < 60 && Math.random() < 0.1) spawnTree();
+}
+
+function checkCollisions() {
+  const truckPos = truck.position;
+  cars.forEach(c => {
+    if (c.totaled) return;
+    const d = c.mesh.position.distanceTo(truckPos);
+    if (d < 3.5) {
+      const impact = Math.abs(state.speed);
+      if (impact > 6) {
+        const dmg = 1 + Math.floor(impact / 10) + state.armorLevel;
+        c.health -= dmg;
+        // Bounce truck
+        state.speed *= (0.4 - state.armorLevel * 0.05);
+        // Push car aside
+        const push = new THREE.Vector3().subVectors(c.mesh.position, truckPos).normalize();
+        c.mesh.position.add(push.multiplyScalar(1.5));
+        c.mesh.rotation.z = (Math.random()-0.5) * 0.3;
+        showMsg('💥 CRASH!');
+        if (c.health <= 0) {
+          c.totaled = true;
+          c.speed = 0;
+          c.mesh.traverse(o => {
+            if (o.material && o.material.color) {
+              o.material = o.material.clone();
+              o.material.color.multiplyScalar(0.5);
+            }
+          });
+          c.mesh.rotation.z = 0.15;
+          showMsg(`💀 ${c.type.name} TOTALED! Press F to hook`);
+        }
+      } else {
+        // Gentle bump
+        state.speed *= 0.7;
+      }
+    }
+  });
+}
+
+function updateAttachedCars() {
+  const back = new THREE.Vector3(0, 0, -1).applyEuler(truck.rotation);
+  attachedCars.forEach((c, i) => {
+    const offset = 4.5 + i * 4.2;
+    const pos = truck.position.clone().add(back.clone().multiplyScalar(offset));
+    c.mesh.position.set(pos.x, 0, pos.z);
+    c.mesh.rotation.y = truck.rotation.y;
+    c.mesh.rotation.z = 0.1;
+  });
+}
+
+function drainStats(dt) {
+  state.food -= dt * 0.6;
+  state.drink -= dt * 0.9;
+  if (state.food <= 0) return gameOver("You forgot to eat. You blacked out at the wheel.");
+  if (state.drink <= 0) return gameOver("You got dehydrated. Should've grabbed water.");
+  if (state.gas <= 0 && Math.abs(state.speed) < 0.5) {
+    // Ran out of gas
+    return gameOver("You ran out of gas in the middle of the highway.");
+  }
+  state.food = Math.max(0, state.food);
+  state.drink = Math.max(0, state.drink);
+  state.gas = Math.max(0, state.gas);
+}
+
+function gameOver(reason) {
+  if (gameState === 'gameover') return;
+  gameState = 'gameover';
+  document.getElementById('gameoverReason').innerText = reason;
+  document.getElementById('finalMoney').innerText = state.money;
+  document.getElementById('gameover').style.display = 'flex';
+}
+
+function updateHUD() {
+  document.getElementById('money').innerText = state.money;
+  document.getElementById('foodBar').style.width = state.food + '%';
+  document.getElementById('drinkBar').style.width = state.drink + '%';
+  document.getElementById('gasBar').style.width = (state.gas/state.maxGas*100) + '%';
+  document.getElementById('speed').innerText = Math.abs(Math.round(state.speed * 2.2));
+  document.getElementById('attached').innerText = attachedCars.length;
+  document.getElementById('freezerStatus').innerText = state.freezer ? `${state.freezerInv.length}/5` : 'None';
+}
+
+function showMsg(text) {
+  const el = document.getElementById('msg');
+  el.innerText = text;
+  msgTimer = 2;
+}
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta());
+
+  if (gameState === 'playing') {
+    updateTruck(dt);
+    updateEnemyCars(dt);
+    updateBuildings();
+    updateTrees();
+    checkCollisions();
+    updateAttachedCars();
+    drainStats(dt);
+    updateHUD();
+  }
+
+  // fade message
+  if (msgTimer > 0) {
+    msgTimer -= dt;
+    if (msgTimer <= 0) document.getElementById('msg').innerText = '';
+  }
+
+  if (renderer) renderer.render(scene, camera);
+}
+
+// ============================================================
+// START
+// ============================================================
+function startGame() {
+  document.getElementById('intro').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  gameState = 'playing';
+  initGame();
+  animate();
+}
+
+// Kick off intro
+playIntro();
+</script>
+</body>
+</html>

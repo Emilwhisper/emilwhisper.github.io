@@ -1,0 +1,4735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0"
+>
+<title>Daniel Catches the Car</title>
+
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #111;
+    color: #fff;
+    font-family: "Trebuchet MS", sans-serif;
+  }
+
+  button {
+    font-family: inherit;
+  }
+
+  #game {
+    position: fixed;
+    inset: 0;
+  }
+
+  /* =====================================================
+     INTRO
+     ===================================================== */
+
+  #intro {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+    text-align: center;
+
+    background:
+      linear-gradient(
+        #1b1030,
+        #3a1f4d 60%,
+        #6b3d2e
+      );
+  }
+
+  #intro h1 {
+    color: #ffd23f;
+    font-size: clamp(36px, 6vw, 64px);
+    letter-spacing: 2px;
+    text-shadow: 3px 3px 0 #000;
+  }
+
+  #intro .sub {
+    margin-top: 6px;
+    color: #ffffbb;
+    font-style: italic;
+  }
+
+  .room {
+    position: relative;
+    width: min(520px, 90vw);
+    margin: 24px 0;
+    padding: 24px;
+
+    border: 4px solid #000;
+    border-radius: 14px;
+
+    background: #2a2233;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  }
+
+  .bed {
+    font-size: 64px;
+  }
+
+  .dog {
+    display: inline-block;
+    font-size: 44px;
+    animation: snore 2.5s infinite;
+  }
+
+  .daniel {
+    display: inline-block;
+    font-size: 64px;
+    animation: wobble 1.6s infinite ease-in-out;
+  }
+
+  .keys {
+    display: inline-block;
+    font-size: 40px;
+    animation: jingle 0.5s infinite;
+  }
+
+  .story {
+    max-width: 520px;
+    margin-top: 8px;
+
+    color: #eee;
+    line-height: 1.5;
+  }
+
+  @keyframes snore {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  @keyframes wobble {
+    0%,
+    100% {
+      transform: rotate(-8deg);
+    }
+
+    50% {
+      transform: rotate(8deg);
+    }
+  }
+
+  @keyframes jingle {
+    0%,
+    100% {
+      transform: rotate(-10deg);
+    }
+
+    50% {
+      transform: rotate(10deg);
+    }
+  }
+
+  .btn {
+    margin-top: 22px;
+    padding: 16px 34px;
+
+    border: none;
+    border-bottom: 5px solid #b8901a;
+    border-radius: 10px;
+
+    background: #ffd23f;
+    color: #222;
+
+    cursor: pointer;
+    font-size: 22px;
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+
+  .btn:hover {
+    background: #ffe27a;
+  }
+
+  .btn:active {
+    transform: translateY(3px);
+    border-bottom-width: 2px;
+  }
+
+  /* =====================================================
+     HUD
+     ===================================================== */
+
+  #hud {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .bar-wrap {
+    position: absolute;
+    left: 16px;
+    width: 230px;
+  }
+
+  .bar-label {
+    margin-bottom: 2px;
+    font-size: 13px;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  .bar-bg {
+    height: 16px;
+
+    overflow: hidden;
+    border: 2px solid #000;
+    border-radius: 8px;
+
+    background: rgba(0, 0, 0, 0.55);
+  }
+
+  .bar-fill {
+    width: 100%;
+    height: 100%;
+    transition: width 0.12s linear;
+  }
+
+  #topright {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+
+    text-align: right;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  #topright div {
+    margin: 2px 0;
+  }
+
+  #topright .money {
+    color: #7dff8a;
+    font-size: 30px;
+    font-weight: bold;
+  }
+
+  #prompt {
+    position: absolute;
+    bottom: 120px;
+    left: 50%;
+
+    display: none;
+    padding: 12px 22px;
+
+    transform: translateX(-50%);
+
+    border: 2px solid #ffd23f;
+    border-radius: 10px;
+
+    background: rgba(0, 0, 0, 0.75);
+    font-size: 20px;
+    text-align: center;
+  }
+
+  #controls-hint {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+
+    width: min(900px, 75vw);
+
+    transform: translateX(-50%);
+
+    color: #ccc;
+    font-size: 12px;
+    text-align: center;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  #warn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+
+    display: none;
+    padding: 8px;
+
+    background: rgba(200, 0, 0, 0.72);
+    color: #fff;
+
+    font-size: 22px;
+    font-weight: bold;
+    text-align: center;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  #mute {
+    position: absolute;
+    right: 16px;
+    bottom: 14px;
+
+    color: #ddd;
+    font-size: 12px;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  /* =====================================================
+     SHOP MENU
+     ===================================================== */
+
+  #menu {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+
+    display: none;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0, 0, 0, 0.75);
+  }
+
+  .panel {
+    width: min(560px, 92vw);
+    max-height: 88vh;
+    padding: 24px;
+    overflow: auto;
+
+    border: 4px solid #000;
+    border-radius: 14px;
+
+    background: #241d30;
+    box-shadow: 0 10px 50px #000;
+  }
+
+  .panel h2 {
+    margin-bottom: 6px;
+    color: #ffd23f;
+    text-align: center;
+  }
+
+  .panel .place-sub {
+    margin-bottom: 14px;
+    color: #bbb;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  #menu-money {
+    margin: 6px 0 14px;
+    color: #7dff8a;
+    font-size: 20px;
+    text-align: center;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+
+    margin: 8px 0;
+    padding: 10px 14px;
+
+    border-radius: 8px;
+    background: #332a44;
+  }
+
+  .row .name {
+    font-weight: bold;
+  }
+
+  .row .desc {
+    color: #ddd;
+    font-size: 14px;
+  }
+
+  .buy {
+    padding: 9px 16px;
+
+    border: none;
+    border-bottom: 4px solid #1c6db0;
+    border-radius: 8px;
+
+    background: #3fa7ff;
+    color: #fff;
+
+    cursor: pointer;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+
+  .buy:hover {
+    background: #6fc0ff;
+  }
+
+  .buy:disabled {
+    border-bottom-color: #333;
+    background: #555;
+    color: #999;
+    cursor: not-allowed;
+  }
+
+  .buy.sell {
+    border-bottom-color: #3fae4c;
+    background: #7dff8a;
+    color: #123;
+  }
+
+  .buy.sell:hover {
+    background: #a6ffb0;
+  }
+
+  .close-btn {
+    border-bottom-color: #b03636;
+    background: #ff5b5b;
+  }
+
+  .close-btn:hover {
+    background: #ff8080;
+  }
+
+  /* =====================================================
+     GAME OVER
+     ===================================================== */
+
+  #over {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    background: rgba(20, 0, 0, 0.92);
+    text-align: center;
+  }
+
+  #over h1 {
+    color: #ff4040;
+    font-size: clamp(52px, 9vw, 90px);
+    text-shadow: 3px 3px 0 #000;
+  }
+
+  #over p {
+    margin: 16px 0;
+    color: #eee;
+    font-size: 22px;
+  }
+
+  #over .emoji {
+    font-size: 80px;
+  }
+
+  /* =====================================================
+     SMALL SCREENS
+     ===================================================== */
+
+  @media (max-width: 650px) {
+    .bar-wrap {
+      width: 165px;
+    }
+
+    #topright {
+      font-size: 13px;
+    }
+
+    #topright .money {
+      font-size: 23px;
+    }
+
+    #controls-hint {
+      bottom: 8px;
+      width: 70vw;
+      font-size: 10px;
+    }
+
+    #mute {
+      bottom: 8px;
+      font-size: 10px;
+    }
+
+    #prompt {
+      bottom: 90px;
+      width: 90vw;
+      font-size: 16px;
+    }
+
+    #warn {
+      font-size: 17px;
+    }
+  }
+</style>
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<!-- =====================================================
+     INTRO
+     ===================================================== -->
+
+<div id="intro">
+  <h1>DANIEL CATCHES THE CAR</h1>
+  <div class="sub">A hungover repo adventure</div>
+
+  <div class="room">
+    <div>
+      <span class="bed">🛏️</span>
+      <span class="dog">🐕</span>
+    </div>
+
+    <div style="margin-top: 14px;">
+      <span class="daniel">🥴</span>
+      <span class="keys">🔑</span>
+    </div>
+
+    <div class="story">
+      Ugh... Daniel rolls out of bed. His head is pounding, and Rufus
+      the dog is still snoring under the blankets. But the repo business
+      calls. Daniel grabs his keys, stumbles to the big yellow truck,
+      and heads for the winding highway...
+    </div>
+  </div>
+
+  <button class="btn" onclick="startGame()">
+    🔑 Grab keys &amp; drive
+  </button>
+</div>
+
+<!-- =====================================================
+     HUD
+     ===================================================== -->
+
+<div id="hud">
+  <div id="warn"></div>
+
+  <div class="bar-wrap" style="top: 14px;">
+    <div class="bar-label">🍔 FOOD</div>
+
+    <div class="bar-bg">
+      <div
+        id="food-bar"
+        class="bar-fill"
+        style="background: #ff9f43;"
+      ></div>
+    </div>
+  </div>
+
+  <div class="bar-wrap" style="top: 56px;">
+    <div class="bar-label">🥤 DRINK</div>
+
+    <div class="bar-bg">
+      <div
+        id="drink-bar"
+        class="bar-fill"
+        style="background: #54a0ff;"
+      ></div>
+    </div>
+  </div>
+
+  <div class="bar-wrap" style="top: 98px;">
+    <div class="bar-label">⛽ GAS</div>
+
+    <div class="bar-bg">
+      <div
+        id="gas-bar"
+        class="bar-fill"
+        style="background: #ee5253;"
+      ></div>
+    </div>
+  </div>
+
+  <div id="topright">
+    <div class="money">
+      $<span id="money">0</span>
+    </div>
+
+    <div>
+      🚗 Attached:
+      <span id="attached">0</span>/3
+    </div>
+
+    <div>
+      🏎️ <span id="speed">0</span> mph
+    </div>
+
+    <div>
+      🛴 Scooter wrecks:
+      <span id="scooter-count">0</span>
+    </div>
+
+    <div id="freezer-info" style="display: none;">
+      🧊 Food:
+      <span id="fz-food">0</span>
+
+      Drink:
+      <span id="fz-drink">0</span>
+    </div>
+  </div>
+
+  <div id="prompt">
+    Press <b>E</b> to enter
+  </div>
+
+  <div id="controls-hint">
+    W/↑ gas · S/↓ brake · A/D or ←/→ steer · Ram cars to
+    total and hook · Scooter wrecks pay small cash but cannot
+    be hooked · E interact · F eat · G drink · M mute
+  </div>
+
+  <div id="mute">
+    🔊 Sound on (M)
+  </div>
+</div>
+
+<!-- =====================================================
+     MENU
+     ===================================================== -->
+
+<div id="menu">
+  <div class="panel">
+    <h2 id="menu-title">Stop</h2>
+
+    <div
+      class="place-sub"
+      id="menu-sub"
+    ></div>
+
+    <div id="menu-money">
+      Cash:
+      $<span id="menu-money-val">0</span>
+    </div>
+
+    <div id="menu-body"></div>
+
+    <button
+      class="buy close-btn"
+      style="width: 100%; margin-top: 10px;"
+      onclick="closeMenu()"
+    >
+      Leave (E)
+    </button>
+  </div>
+</div>
+
+<!-- =====================================================
+     GAME OVER
+     ===================================================== -->
+
+<div id="over">
+  <div class="emoji">🥴💥</div>
+
+  <h1>WTF DANIEL</h1>
+
+  <p id="over-reason"></p>
+
+  <p>
+    You made
+    <b>$<span id="over-money">0</span></b>
+    before it all went wrong.
+  </p>
+
+  <button
+    class="btn"
+    onclick="location.reload()"
+  >
+    Try again
+  </button>
+</div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+"use strict";
+
+/* =========================================================
+   DANIEL CATCHES THE CAR
+   ========================================================= */
+
+let scene;
+let camera;
+let renderer;
+let grass;
+
+let state = "intro";
+let gameTime = 0;
+let shake = 0;
+
+/* =========================================================
+   GAME DATA
+   ========================================================= */
+
+const G = {
+  food: 100,
+  maxFood: 100,
+
+  drink: 100,
+  maxDrink: 100,
+
+  gas: 100,
+  money: 0,
+
+  gasTankLvl: 0,
+  turboLvl: 0,
+  armorLvl: 0,
+
+  hasFreezer: false,
+  fzFood: 0,
+  fzDrink: 0,
+
+  scooterWrecks: 0
+};
+
+function maxGas() {
+  return [100, 150, 200, 260][G.gasTankLvl];
+}
+
+function maxSpeed() {
+  return [1.3, 1.7, 2.1, 2.6][G.turboLvl];
+}
+
+function ramDamage() {
+  return [22, 38, 55, 80][G.armorLvl];
+}
+
+/* =========================================================
+   PLAYER TRUCK
+   ========================================================= */
+
+const truck = {
+  obj: null,
+
+  x: 0,
+  z: 0,
+
+  heading: 0,
+  speed: 0
+};
+
+const attached = [];
+const trail = [];
+
+const TRAIL_GAP = 14;
+const MAX_ATTACHED = 3;
+
+/* =========================================================
+   WORLD COLLECTIONS
+   ========================================================= */
+
+const cars = [];
+const scooters = [];
+const stops = [];
+const hazards = [];
+
+let nextStopZ = 130;
+let roadFrontZ = -80;
+let hazardFrontZ = 90;
+let stopCycle = 0;
+
+/* =========================================================
+   ROAD DATA
+   ========================================================= */
+
+const SEGMENT_LENGTH = 8;
+const ROAD_WIDTH = 40;
+const ROAD_HALF = 18;
+
+const roadSegments = [];
+
+let roadMaterial;
+let dashMaterial;
+
+/*
+  Smooth procedural center line.
+
+  Multiple sine waves are combined to create highway bends.
+*/
+function centerX(z) {
+  return (
+    Math.sin(z * 0.0048) * 24 +
+    Math.sin(z * 0.011 + 2.0) * 11 +
+    Math.sin(z * 0.023 + 0.6) * 4
+  );
+}
+
+/*
+  Returns the direction of the road at a given distance.
+*/
+function roadAngle(z) {
+  const sampleDistance = 0.6;
+
+  const xBefore = centerX(z - sampleDistance);
+  const xAfter = centerX(z + sampleDistance);
+
+  return Math.atan2(
+    xAfter - xBefore,
+    sampleDistance * 2
+  );
+}
+
+/* =========================================================
+   VEHICLE TYPES
+   ========================================================= */
+
+const CAR_TYPES = [
+  {
+    name: "Rusty Junker",
+    color: 0x8a6d3b,
+    value: 120,
+    health: 60
+  },
+  {
+    name: "Sedan",
+    color: 0x9aa0a6,
+    value: 250,
+    health: 100
+  },
+  {
+    name: "Taxi",
+    color: 0xf4c20d,
+    value: 320,
+    health: 110
+  },
+  {
+    name: "Family Van",
+    color: 0x2e86de,
+    value: 400,
+    health: 150
+  },
+  {
+    name: "Sports Car",
+    color: 0xe74c3c,
+    value: 650,
+    health: 90
+  },
+  {
+    name: "Fancy Limo",
+    color: 0x1e1e28,
+    value: 950,
+    health: 180
+  }
+];
+
+const SCOOTER_TYPES = [
+  {
+    name: "Rental E-Scooter",
+    color: 0x2ed573,
+    shirt: 0x3498db,
+    helmet: 0xffffff,
+    value: 20
+  },
+  {
+    name: "Delivery E-Scooter",
+    color: 0xffa502,
+    shirt: 0xff4757,
+    helmet: 0x222222,
+    value: 35
+  },
+  {
+    name: "Premium E-Scooter",
+    color: 0x9b59b6,
+    shirt: 0x2f3542,
+    helmet: 0xf1c40f,
+    value: 55
+  }
+];
+
+/* =========================================================
+   INPUT
+   ========================================================= */
+
+const keys = {};
+
+document.addEventListener("keydown", function(event) {
+  keys[event.code] = true;
+
+  const onePressKeys = [
+    "KeyE",
+    "KeyF",
+    "KeyG",
+    "KeyM"
+  ];
+
+  if (
+    event.repeat &&
+    onePressKeys.includes(event.code)
+  ) {
+    return;
+  }
+
+  if (event.code === "KeyE") {
+    handleInteract();
+  }
+
+  if (event.code === "KeyF") {
+    eatFromFreezer();
+  }
+
+  if (event.code === "KeyG") {
+    drinkFromFreezer();
+  }
+
+  if (event.code === "KeyM") {
+    Sound.toggleMute();
+  }
+});
+
+document.addEventListener("keyup", function(event) {
+  keys[event.code] = false;
+});
+
+/* =========================================================
+   SYNTHESIZED AUDIO
+   ========================================================= */
+
+const Sound = (function() {
+  let ctx;
+
+  let master;
+  let musicGain;
+  let sfxGain;
+
+  let engineOscillator;
+  let engineSubOscillator;
+  let engineGain;
+  let engineFilter;
+
+  let noiseBuffer;
+
+  let started = false;
+  let muted = false;
+
+  let schedulerTimer = null;
+  let nextNoteTime = 0;
+  let musicStep = 0;
+
+  const stepDuration = 60 / 132 / 2;
+
+  const bassPattern = [
+    0, 0, -99, 7,
+    0, -99, 5, 0,
+    0, 0, -99, 7,
+    3, -99, 5, 7
+  ];
+
+  const leadPattern = [
+    12, -99, 15, -99,
+    19, 15, 12, -99,
+    10, -99, 12, -99,
+    15, 17, 19, -99
+  ];
+
+  function noteFrequency(base, semitones) {
+    return base * Math.pow(2, semitones / 12);
+  }
+
+  function init() {
+    if (started) {
+      if (
+        ctx &&
+        ctx.state === "suspended"
+      ) {
+        ctx.resume();
+      }
+
+      return;
+    }
+
+    started = true;
+
+    ctx = new (
+      window.AudioContext ||
+      window.webkitAudioContext
+    )();
+
+    ctx.resume();
+
+    master = ctx.createGain();
+    master.gain.value = 0.9;
+    master.connect(ctx.destination);
+
+    musicGain = ctx.createGain();
+    musicGain.gain.value = 0.22;
+    musicGain.connect(master);
+
+    sfxGain = ctx.createGain();
+    sfxGain.gain.value = 0.6;
+    sfxGain.connect(master);
+
+    createNoiseBuffer();
+    createEngine();
+    startMusic();
+  }
+
+  function createNoiseBuffer() {
+    noiseBuffer = ctx.createBuffer(
+      1,
+      ctx.sampleRate,
+      ctx.sampleRate
+    );
+
+    const data = noiseBuffer.getChannelData(0);
+
+    for (let i = 0; i < data.length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+  }
+
+  function createEngine() {
+    engineOscillator = ctx.createOscillator();
+    engineOscillator.type = "sawtooth";
+    engineOscillator.frequency.value = 55;
+
+    engineSubOscillator = ctx.createOscillator();
+    engineSubOscillator.type = "square";
+    engineSubOscillator.frequency.value = 27;
+
+    engineFilter = ctx.createBiquadFilter();
+    engineFilter.type = "lowpass";
+    engineFilter.frequency.value = 500;
+
+    engineGain = ctx.createGain();
+    engineGain.gain.value = 0;
+
+    engineOscillator.connect(engineFilter);
+    engineSubOscillator.connect(engineFilter);
+
+    engineFilter.connect(engineGain);
+    engineGain.connect(master);
+
+    engineOscillator.start();
+    engineSubOscillator.start();
+  }
+
+  function startMusic() {
+    nextNoteTime = ctx.currentTime + 0.1;
+    musicStep = 0;
+
+    schedulerTimer = setInterval(
+      musicScheduler,
+      25
+    );
+  }
+
+  function musicScheduler() {
+    if (!ctx) {
+      return;
+    }
+
+    while (
+      nextNoteTime <
+      ctx.currentTime + 0.2
+    ) {
+      playMusicStep(
+        musicStep,
+        nextNoteTime
+      );
+
+      nextNoteTime += stepDuration;
+      musicStep = (musicStep + 1) % 16;
+    }
+  }
+
+  function playMusicStep(step, time) {
+    const bassNote = bassPattern[step];
+
+    if (bassNote > -90) {
+      musicTone(
+        noteFrequency(55, bassNote),
+        time,
+        stepDuration * 1.6,
+        "square",
+        0.5
+      );
+    }
+
+    const leadNote = leadPattern[step];
+
+    if (leadNote > -90) {
+      musicTone(
+        noteFrequency(220, leadNote),
+        time,
+        stepDuration * 1.2,
+        "triangle",
+        0.28
+      );
+    }
+
+    if (step % 2 === 0) {
+      hiHat(time);
+    }
+  }
+
+  function musicTone(
+    frequency,
+    time,
+    duration,
+    type,
+    peak
+  ) {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    oscillator.type = type;
+    oscillator.frequency.value = frequency;
+
+    gain.gain.setValueAtTime(0, time);
+    gain.gain.linearRampToValueAtTime(
+      peak,
+      time + 0.01
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      time + duration
+    );
+
+    oscillator.connect(gain);
+    gain.connect(musicGain);
+
+    oscillator.start(time);
+    oscillator.stop(time + duration + 0.02);
+  }
+
+  function hiHat(time) {
+    const source = ctx.createBufferSource();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+
+    source.buffer = noiseBuffer;
+
+    filter.type = "highpass";
+    filter.frequency.value = 7000;
+
+    gain.gain.setValueAtTime(
+      0.06,
+      time
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      time + 0.05
+    );
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(musicGain);
+
+    source.start(time);
+    source.stop(time + 0.06);
+  }
+
+  function noiseBurst(
+    duration,
+    peak,
+    cutoff
+  ) {
+    if (!ctx) {
+      return;
+    }
+
+    const source = ctx.createBufferSource();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+
+    const time = ctx.currentTime;
+
+    source.buffer = noiseBuffer;
+
+    filter.type = "lowpass";
+    filter.frequency.value = cutoff || 1500;
+
+    gain.gain.setValueAtTime(
+      peak,
+      time
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      time + duration
+    );
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(sfxGain);
+
+    source.start(time);
+    source.stop(time + duration + 0.02);
+  }
+
+  function blip(
+    frequency,
+    duration,
+    type,
+    peak
+  ) {
+    if (!ctx) {
+      return;
+    }
+
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    const time = ctx.currentTime;
+
+    oscillator.type = type || "square";
+    oscillator.frequency.value = frequency;
+
+    gain.gain.setValueAtTime(
+      peak || 0.3,
+      time
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      time + duration
+    );
+
+    oscillator.connect(gain);
+    gain.connect(sfxGain);
+
+    oscillator.start(time);
+    oscillator.stop(time + duration + 0.02);
+  }
+
+  function slide(
+    startFrequency,
+    endFrequency,
+    duration,
+    type,
+    peak
+  ) {
+    if (!ctx) {
+      return;
+    }
+
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    const time = ctx.currentTime;
+
+    oscillator.type = type || "sawtooth";
+
+    oscillator.frequency.setValueAtTime(
+      startFrequency,
+      time
+    );
+
+    oscillator.frequency.exponentialRampToValueAtTime(
+      endFrequency,
+      time + duration
+    );
+
+    gain.gain.setValueAtTime(
+      peak || 0.3,
+      time
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      time + duration
+    );
+
+    oscillator.connect(gain);
+    gain.connect(sfxGain);
+
+    oscillator.start(time);
+    oscillator.stop(time + duration + 0.02);
+  }
+
+  return {
+    init: init,
+
+    setEngine: function(speed) {
+      if (!ctx) {
+        return;
+      }
+
+      const time = ctx.currentTime;
+      const amount = Math.abs(speed);
+
+      engineOscillator.frequency.setTargetAtTime(
+        50 + amount * 95,
+        time,
+        0.06
+      );
+
+      engineSubOscillator.frequency.setTargetAtTime(
+        25 + amount * 45,
+        time,
+        0.06
+      );
+
+      engineFilter.frequency.setTargetAtTime(
+        350 + amount * 850,
+        time,
+        0.08
+      );
+
+      engineGain.gain.setTargetAtTime(
+        Math.min(
+          0.13,
+          0.02 + amount * 0.10
+        ),
+        time,
+        0.1
+      );
+    },
+
+    engineOff: function() {
+      if (!ctx) {
+        return;
+      }
+
+      engineGain.gain.setTargetAtTime(
+        0,
+        ctx.currentTime,
+        0.2
+      );
+    },
+
+    crash: function() {
+      noiseBurst(0.35, 0.7, 1800);
+      slide(180, 40, 0.3, "square", 0.35);
+    },
+
+    thud: function() {
+      noiseBurst(0.18, 0.5, 600);
+      blip(70, 0.2, "sine", 0.4);
+    },
+
+    knock: function() {
+      blip(300, 0.08, "square", 0.3);
+      noiseBurst(0.1, 0.25, 3000);
+    },
+
+    skid: function() {
+      noiseBurst(0.4, 0.35, 2500);
+    },
+
+    hook: function() {
+      blip(880, 0.08, "square", 0.3);
+
+      setTimeout(function() {
+        blip(1320, 0.12, "square", 0.3);
+      }, 80);
+    },
+
+    coin: function() {
+      blip(988, 0.08, "square", 0.3);
+
+      setTimeout(function() {
+        blip(1319, 0.14, "square", 0.3);
+      }, 80);
+    },
+
+    buy: function() {
+      blip(660, 0.06, "square", 0.25);
+    },
+
+    low: function() {
+      blip(440, 0.12, "sine", 0.25);
+    },
+
+    gameOver: function() {
+      slide(400, 60, 1.1, "sawtooth", 0.4);
+    },
+
+    toggleMute: function() {
+      if (!ctx) {
+        return;
+      }
+
+      muted = !muted;
+
+      master.gain.setTargetAtTime(
+        muted ? 0 : 0.9,
+        ctx.currentTime,
+        0.05
+      );
+
+      document.getElementById(
+        "mute"
+      ).textContent = muted
+        ? "🔇 Muted (M)"
+        : "🔊 Sound on (M)";
+    }
+  };
+})();
+
+/* =========================================================
+   THREE.JS SETUP
+   ========================================================= */
+
+function initThree() {
+  scene = new THREE.Scene();
+
+  scene.background = new THREE.Color(
+    0x87b7e6
+  );
+
+  scene.fog = new THREE.Fog(
+    0x87b7e6,
+    120,
+    340
+  );
+
+  camera = new THREE.PerspectiveCamera(
+    60,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+
+  renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById("game"),
+    antialias: true
+  });
+
+  renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+  );
+
+  renderer.setPixelRatio(
+    Math.min(
+      window.devicePixelRatio,
+      2
+    )
+  );
+
+  renderer.shadowMap.enabled = true;
+
+  if (THREE.sRGBEncoding) {
+    renderer.outputEncoding =
+      THREE.sRGBEncoding;
+  }
+
+  const hemisphereLight =
+    new THREE.HemisphereLight(
+      0xbfd8ff,
+      0x556644,
+      0.9
+    );
+
+  scene.add(hemisphereLight);
+
+  const sun =
+    new THREE.DirectionalLight(
+      0xffffff,
+      0.8
+    );
+
+  sun.position.set(40, 80, 20);
+  sun.castShadow = true;
+
+  sun.shadow.camera.left = -120;
+  sun.shadow.camera.right = 120;
+  sun.shadow.camera.top = 120;
+  sun.shadow.camera.bottom = -120;
+
+  scene.add(sun);
+
+  grass = new THREE.Mesh(
+    new THREE.PlaneGeometry(
+      700,
+      1400
+    ),
+    new THREE.MeshStandardMaterial({
+      color: 0x4c8c3a
+    })
+  );
+
+  grass.rotation.x = -Math.PI / 2;
+  grass.receiveShadow = true;
+
+  scene.add(grass);
+
+  roadMaterial =
+    new THREE.MeshStandardMaterial({
+      color: 0x3a3a42
+    });
+
+  dashMaterial =
+    new THREE.MeshStandardMaterial({
+      color: 0xf1c40f
+    });
+
+  buildTruck();
+
+  window.addEventListener(
+    "resize",
+    onResize
+  );
+}
+
+function onResize() {
+  camera.aspect =
+    window.innerWidth /
+    window.innerHeight;
+
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+  );
+}
+
+/* =========================================================
+   MESH HELPERS
+   ========================================================= */
+
+function box(
+  width,
+  height,
+  depth,
+  color,
+  x,
+  y,
+  z
+) {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(
+      width,
+      height,
+      depth
+    ),
+    new THREE.MeshStandardMaterial({
+      color: color
+    })
+  );
+
+  mesh.position.set(
+    x || 0,
+    y || 0,
+    z || 0
+  );
+
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  return mesh;
+}
+
+function cylinder(
+  radiusTop,
+  radiusBottom,
+  height,
+  segments,
+  color
+) {
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(
+      radiusTop,
+      radiusBottom,
+      height,
+      segments
+    ),
+    new THREE.MeshStandardMaterial({
+      color: color
+    })
+  );
+
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  return mesh;
+}
+
+/* =========================================================
+   TRUCK MODEL
+   ========================================================= */
+
+function buildTruck() {
+  const group = new THREE.Group();
+
+  /* Cab */
+  group.add(
+    box(
+      4.2,
+      2.2,
+      3.2,
+      0xffcc00,
+      0,
+      1.6,
+      2
+    )
+  );
+
+  /* Windshield */
+  group.add(
+    box(
+      3.6,
+      1.2,
+      0.3,
+      0x2b3a55,
+      0,
+      2.2,
+      0.5
+    )
+  );
+
+  /* Flatbed */
+  group.add(
+    box(
+      4.4,
+      0.6,
+      6.5,
+      0xdba800,
+      0,
+      0.9,
+      -2.6
+    )
+  );
+
+  /* Tow arm */
+  group.add(
+    box(
+      0.5,
+      0.5,
+      3,
+      0x444444,
+      0,
+      2.4,
+      -4
+    )
+  );
+
+  group.add(
+    box(
+      0.5,
+      2,
+      0.5,
+      0x444444,
+      0,
+      1.6,
+      -2.6
+    )
+  );
+
+  /* Warning light */
+  group.add(
+    box(
+      1,
+      0.35,
+      0.5,
+      0xff7a00,
+      0,
+      2.95,
+      1.8
+    )
+  );
+
+  /* Wheels */
+  const wheelPositions = [
+    [-2, -4.2],
+    [2, -4.2],
+    [-2, -0.5],
+    [2, -0.5],
+    [-2, 2.5],
+    [2, 2.5]
+  ];
+
+  wheelPositions.forEach(function(position) {
+    group.add(
+      box(
+        0.7,
+        1.4,
+        1.4,
+        0x111111,
+        position[0],
+        0.7,
+        position[1]
+      )
+    );
+  });
+
+  scene.add(group);
+  truck.obj = group;
+}
+
+/* =========================================================
+   CAR MODEL
+   ========================================================= */
+
+function makeCar(type) {
+  const group = new THREE.Group();
+
+  const body = box(
+    3.2,
+    1.2,
+    5.2,
+    type.color,
+    0,
+    0.9,
+    0
+  );
+
+  group.add(body);
+
+  group.add(
+    box(
+      2.6,
+      1,
+      2.8,
+      type.color,
+      0,
+      1.8,
+      -0.2
+    )
+  );
+
+  group.add(
+    box(
+      2.4,
+      0.7,
+      0.2,
+      0x223344,
+      0,
+      1.9,
+      1.2
+    )
+  );
+
+  const wheelPositions = [
+    [-1.4, -1.6],
+    [1.4, -1.6],
+    [-1.4, 1.6],
+    [1.4, 1.6]
+  ];
+
+  wheelPositions.forEach(function(position) {
+    group.add(
+      box(
+        0.5,
+        1.1,
+        1.1,
+        0x111111,
+        position[0],
+        0.55,
+        position[1]
+      )
+    );
+  });
+
+  scene.add(group);
+
+  return {
+    obj: group,
+    body: body,
+    type: type,
+
+    x: 0,
+    z: 0,
+
+    laneOffset: 0,
+    heading: 0,
+
+    speed:
+      0.1 +
+      Math.random() * 0.22,
+
+    health: type.health,
+    maxHealth: type.health,
+
+    totaled: false,
+    hooked: false,
+
+    lastImpact: -10
+  };
+}
+
+/* =========================================================
+   SCOOTER AND RIDER MODEL
+   ========================================================= */
+
+function makeScooter(type) {
+  const group = new THREE.Group();
+
+  /* Scooter assembly */
+  const scooterBody =
+    new THREE.Group();
+
+  scooterBody.add(
+    box(
+      0.9,
+      0.14,
+      2,
+      type.color,
+      0,
+      0.38,
+      0
+    )
+  );
+
+  /* Battery */
+  scooterBody.add(
+    box(
+      0.55,
+      0.3,
+      0.8,
+      0x222222,
+      0,
+      0.48,
+      -0.1
+    )
+  );
+
+  /* Steering stem */
+  scooterBody.add(
+    box(
+      0.12,
+      1.15,
+      0.12,
+      0x333333,
+      0,
+      0.95,
+      0.8
+    )
+  );
+
+  /* Handlebars */
+  scooterBody.add(
+    box(
+      0.9,
+      0.1,
+      0.1,
+      0x222222,
+      0,
+      1.5,
+      0.8
+    )
+  );
+
+  /* Scooter wheels */
+  [-0.82, 0.82].forEach(
+    function(wheelZ) {
+      const wheel = cylinder(
+        0.28,
+        0.28,
+        0.16,
+        12,
+        0x111111
+      );
+
+      wheel.rotation.z =
+        Math.PI / 2;
+
+      wheel.position.set(
+        0,
+        0.28,
+        wheelZ
+      );
+
+      scooterBody.add(wheel);
+    }
+  );
+
+  group.add(scooterBody);
+
+  /* Rider */
+  const rider = new THREE.Group();
+
+  const skinColors = [
+    0xffdbac,
+    0xf1c27d,
+    0xc68642,
+    0x8d5524
+  ];
+
+  const skin =
+    skinColors[
+      Math.floor(
+        Math.random() *
+        skinColors.length
+      )
+    ];
+
+  /* Legs */
+  rider.add(
+    box(
+      0.18,
+      0.85,
+      0.18,
+      0x243447,
+      -0.16,
+      0.92,
+      -0.12
+    )
+  );
+
+  rider.add(
+    box(
+      0.18,
+      0.85,
+      0.18,
+      0x243447,
+      0.16,
+      0.92,
+      -0.12
+    )
+  );
+
+  /* Shoes */
+  rider.add(
+    box(
+      0.28,
+      0.14,
+      0.45,
+      0x161616,
+      -0.16,
+      0.48,
+      0.05
+    )
+  );
+
+  rider.add(
+    box(
+      0.28,
+      0.14,
+      0.45,
+      0x161616,
+      0.16,
+      0.48,
+      0.05
+    )
+  );
+
+  /* Body */
+  rider.add(
+    box(
+      0.58,
+      0.9,
+      0.38,
+      type.shirt,
+      0,
+      1.68,
+      -0.12
+    )
+  );
+
+  /* Arms */
+  const leftArm = box(
+    0.16,
+    0.75,
+    0.16,
+    skin,
+    -0.37,
+    1.7,
+    0.25
+  );
+
+  leftArm.rotation.x = -0.45;
+  rider.add(leftArm);
+
+  const rightArm = box(
+    0.16,
+    0.75,
+    0.16,
+    skin,
+    0.37,
+    1.7,
+    0.25
+  );
+
+  rightArm.rotation.x = -0.45;
+  rider.add(rightArm);
+
+  /* Head */
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(
+      0.32,
+      12,
+      10
+    ),
+    new THREE.MeshStandardMaterial({
+      color: skin
+    })
+  );
+
+  head.position.set(
+    0,
+    2.3,
+    -0.12
+  );
+
+  head.castShadow = true;
+  rider.add(head);
+
+  /* Helmet */
+  rider.add(
+    box(
+      0.7,
+      0.18,
+      0.58,
+      type.helmet,
+      0,
+      2.55,
+      -0.12
+    )
+  );
+
+  group.add(rider);
+  scene.add(group);
+
+  return {
+    obj: group,
+    scooterBody: scooterBody,
+    rider: rider,
+    type: type,
+
+    x: 0,
+    z: 0,
+
+    laneOffset: 0,
+
+    speed:
+      0.05 +
+      Math.random() * 0.09,
+
+    wrecked: false,
+    wreckTime: 0,
+    bailDirection: 1
+  };
+}
+
+/* =========================================================
+   ROAD STREAMING
+   ========================================================= */
+
+function ensureRoad(upToZ) {
+  while (roadFrontZ < upToZ) {
+    roadFrontZ += SEGMENT_LENGTH;
+
+    const z = roadFrontZ;
+    const angle = roadAngle(z);
+    const x = centerX(z);
+
+    const roadSegment = new THREE.Mesh(
+      new THREE.BoxGeometry(
+        ROAD_WIDTH,
+        0.1,
+        SEGMENT_LENGTH + 2
+      ),
+      roadMaterial
+    );
+
+    roadSegment.position.set(
+      x,
+      0.03,
+      z
+    );
+
+    roadSegment.rotation.y = angle;
+    roadSegment.receiveShadow = true;
+
+    scene.add(roadSegment);
+    roadSegments.push(roadSegment);
+
+    const centerDash = new THREE.Mesh(
+      new THREE.BoxGeometry(
+        0.9,
+        0.12,
+        4
+      ),
+      dashMaterial
+    );
+
+    centerDash.position.set(
+      x,
+      0.09,
+      z
+    );
+
+    centerDash.rotation.y = angle;
+
+    scene.add(centerDash);
+    roadSegments.push(centerDash);
+
+    /* White edge lines */
+    [-18, 18].forEach(function(offset) {
+      const edgeLine = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          0.35,
+          0.12,
+          SEGMENT_LENGTH + 1
+        ),
+        new THREE.MeshStandardMaterial({
+          color: 0xeaeaea
+        })
+      );
+
+      edgeLine.position.set(
+        x +
+          Math.cos(angle) *
+          offset,
+        0.1,
+        z -
+          Math.sin(angle) *
+          offset
+      );
+
+      edgeLine.rotation.y = angle;
+
+      scene.add(edgeLine);
+      roadSegments.push(edgeLine);
+    });
+  }
+}
+
+function cleanRoad(behindZ) {
+  for (
+    let i = roadSegments.length - 1;
+    i >= 0;
+    i--
+  ) {
+    const segment = roadSegments[i];
+
+    if (
+      segment.position.z <
+      behindZ
+    ) {
+      scene.remove(segment);
+      roadSegments.splice(i, 1);
+    }
+  }
+}
+
+/* =========================================================
+   STOPS AND SIDE BRANCHES
+   ========================================================= */
+
+const STOP_TYPES = [
+  "bar",
+  "garage",
+  "gas"
+];
+
+function makeStop(roadZ) {
+  const side =
+    Math.random() < 0.5
+      ? -1
+      : 1;
+
+  const angle =
+    roadAngle(roadZ);
+
+  const roadX =
+    centerX(roadZ);
+
+  const distanceFromRoad = 38;
+
+  const buildingX =
+    roadX +
+    side *
+    Math.cos(angle) *
+    distanceFromRoad;
+
+  const buildingZ =
+    roadZ -
+    side *
+    Math.sin(angle) *
+    distanceFromRoad;
+
+  const type =
+    STOP_TYPES[
+      stopCycle %
+      STOP_TYPES.length
+    ];
+
+  stopCycle++;
+
+  const group =
+    new THREE.Group();
+
+  group.position.set(
+    buildingX,
+    0,
+    buildingZ
+  );
+
+  group.rotation.y = angle;
+
+  let color;
+  let label;
+
+  if (type === "bar") {
+    color = 0xff6b6b;
+    label = "🍔🍺 DINER & BAR";
+  }
+
+  if (type === "garage") {
+    color = 0x576574;
+    label = "🔧 GARAGE";
+  }
+
+  if (type === "gas") {
+    color = 0x10ac84;
+    label = "⛽ GAS STATION";
+  }
+
+  /* Main building */
+  group.add(
+    box(
+      20,
+      8,
+      16,
+      color,
+      0,
+      4,
+      0
+    )
+  );
+
+  /* Roof */
+  group.add(
+    box(
+      21,
+      1,
+      17,
+      0x2c2c34,
+      0,
+      8.2,
+      0
+    )
+  );
+
+  /* Door */
+  group.add(
+    box(
+      3,
+      5,
+      0.35,
+      0x332211,
+      0,
+      2.5,
+      -8.15
+    )
+  );
+
+  /* Sign pole */
+  group.add(
+    box(
+      1,
+      10,
+      1,
+      0x333333,
+      -side * 11,
+      5,
+      0
+    )
+  );
+
+  /* Sign */
+  group.add(
+    box(
+      8,
+      4,
+      0.5,
+      0xffffff,
+      -side * 11,
+      11,
+      0
+    )
+  );
+
+  /*
+    Branch road. The stop group is aligned with the
+    main road, so local X points toward the highway.
+  */
+  const spurRoad = new THREE.Mesh(
+    new THREE.BoxGeometry(
+      42,
+      0.12,
+      13
+    ),
+    roadMaterial
+  );
+
+  spurRoad.position.set(
+    -side * 20,
+    0.05,
+    0
+  );
+
+  spurRoad.receiveShadow = true;
+  group.add(spurRoad);
+
+  /* Parking area */
+  group.add(
+    box(
+      23,
+      0.1,
+      20,
+      0x555560,
+      0,
+      0.06,
+      0
+    )
+  );
+
+  /* Extra gas station canopy */
+  if (type === "gas") {
+    group.add(
+      box(
+        13,
+        0.5,
+        8,
+        0xffffff,
+        -side * 15,
+        5,
+        0
+      )
+    );
+
+    group.add(
+      box(
+        0.6,
+        5,
+        0.6,
+        0xeeeeee,
+        -side * 11,
+        2.5,
+        -3
+      )
+    );
+
+    group.add(
+      box(
+        0.6,
+        5,
+        0.6,
+        0xeeeeee,
+        -side * 19,
+        2.5,
+        3
+      )
+    );
+  }
+
+  scene.add(group);
+
+  stops.push({
+    type: type,
+    x: buildingX,
+    z: buildingZ,
+    label: label,
+    obj: group
+  });
+}
+
+/* =========================================================
+   HAZARDS
+   ========================================================= */
+
+function makeHazard(
+  type,
+  x,
+  z
+) {
+  let object;
+
+  if (type === "oil") {
+    object = new THREE.Mesh(
+      new THREE.CircleGeometry(
+        3.2,
+        20
+      ),
+      new THREE.MeshStandardMaterial({
+        color: 0x0a0a0a,
+        roughness: 0.25
+      })
+    );
+
+    object.rotation.x =
+      -Math.PI / 2;
+
+    object.position.set(
+      x,
+      0.07,
+      z
+    );
+  }
+
+  if (type === "pothole") {
+    object = new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        1.7,
+        2,
+        0.16,
+        16
+      ),
+      new THREE.MeshStandardMaterial({
+        color: 0x111111
+      })
+    );
+
+    object.position.set(
+      x,
+      0.04,
+      z
+    );
+  }
+
+  if (type === "cone") {
+    object = new THREE.Mesh(
+      new THREE.ConeGeometry(
+        0.7,
+        1.6,
+        10
+      ),
+      new THREE.MeshStandardMaterial({
+        color: 0xff7a00
+      })
+    );
+
+    object.position.set(
+      x,
+      0.8,
+      z
+    );
+
+    object.castShadow = true;
+  }
+
+  scene.add(object);
+
+  hazards.push({
+    obj: object,
+    x: x,
+    z: z,
+    type: type,
+
+    hit: false,
+    lastHit: -9
+  });
+}
+
+function spawnHazards(upToZ) {
+  while (
+    hazardFrontZ <
+    upToZ
+  ) {
+    hazardFrontZ +=
+      55 +
+      Math.random() * 75;
+
+    if (
+      Math.random() <
+      0.72
+    ) {
+      const roadZ =
+        hazardFrontZ;
+
+      const roadX =
+        centerX(roadZ);
+
+      const angle =
+        roadAngle(roadZ);
+
+      const laneOffset =
+        (
+          Math.random() * 2 -
+          1
+        ) * 14;
+
+      const x =
+        roadX +
+        Math.cos(angle) *
+        laneOffset;
+
+      const z =
+        roadZ -
+        Math.sin(angle) *
+        laneOffset;
+
+      const types = [
+        "oil",
+        "pothole",
+        "cone"
+      ];
+
+      const type =
+        types[
+          Math.floor(
+            Math.random() *
+            types.length
+          )
+        ];
+
+      makeHazard(
+        type,
+        x,
+        z
+      );
+    }
+  }
+}
+
+/* =========================================================
+   TRAFFIC SPAWNING
+   ========================================================= */
+
+function spawnCarAhead(distance) {
+  const type =
+    CAR_TYPES[
+      Math.floor(
+        Math.random() *
+        CAR_TYPES.length
+      )
+    ];
+
+  const car =
+    makeCar(type);
+
+  car.z =
+    truck.z +
+    distance +
+    Math.random() * 25;
+
+  car.laneOffset =
+    (
+      Math.random() < 0.5
+        ? -1
+        : 1
+    ) *
+    (
+      4 +
+      Math.random() * 9
+    );
+
+  car.x =
+    centerX(car.z) +
+    car.laneOffset;
+
+  car.obj.position.set(
+    car.x,
+    0,
+    car.z
+  );
+
+  cars.push(car);
+}
+
+function spawnScooterAhead(distance) {
+  const type =
+    SCOOTER_TYPES[
+      Math.floor(
+        Math.random() *
+        SCOOTER_TYPES.length
+      )
+    ];
+
+  const scooter =
+    makeScooter(type);
+
+  scooter.z =
+    truck.z +
+    distance +
+    Math.random() * 30;
+
+  scooter.laneOffset =
+    (
+      Math.random() * 2 -
+      1
+    ) * 13;
+
+  scooter.x =
+    centerX(scooter.z) +
+    scooter.laneOffset;
+
+  scooter.obj.position.set(
+    scooter.x,
+    0,
+    scooter.z
+  );
+
+  scooter.obj.rotation.y =
+    roadAngle(scooter.z);
+
+  scooters.push(scooter);
+}
+
+/* =========================================================
+   START GAME
+   ========================================================= */
+
+function startGame() {
+  document.getElementById(
+    "intro"
+  ).style.display = "none";
+
+  state = "playing";
+
+  Sound.init();
+
+  ensureRoad(420);
+
+  for (let i = 0; i < 6; i++) {
+    makeStop(nextStopZ);
+
+    nextStopZ +=
+      140 +
+      Math.random() * 60;
+  }
+
+  spawnHazards(420);
+
+  for (let i = 0; i < 8; i++) {
+    spawnCarAhead(
+      55 +
+      i * 42
+    );
+  }
+
+  for (let i = 0; i < 5; i++) {
+    spawnScooterAhead(
+      85 +
+      i * 65
+    );
+  }
+}
+
+/* =========================================================
+   MAIN UPDATE
+   ========================================================= */
+
+let currentStop = null;
+
+function update(deltaTime) {
+  if (state !== "playing") {
+    Sound.engineOff();
+    return;
+  }
+
+  gameTime += deltaTime;
+
+  /* -----------------------------------------------------
+     LOWERED SURVIVAL DRAIN RATES
+     ----------------------------------------------------- */
+
+  G.food -=
+    deltaTime * 0.7;
+
+  G.drink -=
+    deltaTime * 0.9;
+
+  /* -----------------------------------------------------
+     DRIVING
+     ----------------------------------------------------- */
+
+  const acceleration = 0.9;
+  const braking = 1.6;
+  const friction = 0.6;
+
+  const accelerating =
+    keys.KeyW ||
+    keys.ArrowUp;
+
+  const brakingOrReversing =
+    keys.KeyS ||
+    keys.ArrowDown;
+
+  if (accelerating) {
+    truck.speed +=
+      acceleration *
+      deltaTime;
+  } else if (brakingOrReversing) {
+    truck.speed -=
+      braking *
+      deltaTime;
+  } else {
+    if (truck.speed > 0) {
+      truck.speed =
+        Math.max(
+          0,
+          truck.speed -
+          friction * deltaTime
+        );
+    } else {
+      truck.speed =
+        Math.min(
+          0,
+          truck.speed +
+          friction * deltaTime
+        );
+    }
+  }
+
+  const topSpeed =
+    maxSpeed();
+
+  truck.speed =
+    Math.max(
+      -topSpeed * 0.4,
+      Math.min(
+        topSpeed,
+        truck.speed
+      )
+    );
+
+  const steerAmount =
+    1.4 *
+    deltaTime *
+    (
+      truck.speed >= 0
+        ? 1
+        : -1
+    );
+
+  if (
+    Math.abs(truck.speed) >
+    0.02
+  ) {
+    if (
+      keys.KeyA ||
+      keys.ArrowLeft
+    ) {
+      truck.heading +=
+        steerAmount;
+    }
+
+    if (
+      keys.KeyD ||
+      keys.ArrowRight
+    ) {
+      truck.heading -=
+        steerAmount;
+    }
+  }
+
+  if (G.gas <= 0) {
+    truck.speed = 0;
+  }
+
+  const moveDistance =
+    truck.speed *
+    deltaTime *
+    60;
+
+  truck.x +=
+    Math.sin(truck.heading) *
+    moveDistance;
+
+  truck.z +=
+    Math.cos(truck.heading) *
+    moveDistance;
+
+  /* -----------------------------------------------------
+     OFF-ROAD DRAG
+     ----------------------------------------------------- */
+
+  const currentRoadX =
+    centerX(truck.z);
+
+  const distanceFromRoad =
+    Math.abs(
+      truck.x -
+      currentRoadX
+    );
+
+  if (
+    distanceFromRoad >
+    ROAD_HALF
+  ) {
+    truck.speed *= 0.93;
+
+    if (
+      Math.abs(truck.speed) >
+      0.3
+    ) {
+      shake = Math.max(
+        shake,
+        0.12
+      );
+    }
+  }
+
+  truck.x =
+    Math.max(
+      currentRoadX - 58,
+      Math.min(
+        currentRoadX + 58,
+        truck.x
+      )
+    );
+
+  /* -----------------------------------------------------
+     GAS DRAIN
+     ----------------------------------------------------- */
+
+  if (
+    Math.abs(truck.speed) >
+      0.05 &&
+    G.gas > 0
+  ) {
+    G.gas -=
+      Math.abs(truck.speed) *
+      deltaTime *
+      1.3;
+
+    if (G.gas < 0) {
+      G.gas = 0;
+    }
+  }
+
+  truck.obj.position.set(
+    truck.x,
+    0,
+    truck.z
+  );
+
+  truck.obj.rotation.y =
+    truck.heading;
+
+  Sound.setEngine(
+    truck.speed
+  );
+
+  /* -----------------------------------------------------
+     ATTACHED CAR TRAIL
+     ----------------------------------------------------- */
+
+  const rearX =
+    truck.x -
+    Math.sin(truck.heading) *
+    5.5;
+
+  const rearZ =
+    truck.z -
+    Math.cos(truck.heading) *
+    5.5;
+
+  trail.unshift({
+    x: rearX,
+    z: rearZ,
+    heading: truck.heading
+  });
+
+  if (trail.length > 220) {
+    trail.pop();
+  }
+
+  attached.forEach(
+    function(car, index) {
+      const trailIndex =
+        Math.min(
+          trail.length - 1,
+          (index + 1) *
+          TRAIL_GAP
+        );
+
+      const trailPosition =
+        trail[trailIndex] || {
+          x: rearX,
+          z: rearZ,
+          heading: truck.heading
+        };
+
+      car.obj.position.set(
+        trailPosition.x,
+        0.9,
+        trailPosition.z
+      );
+
+      car.obj.rotation.y =
+        trailPosition.heading;
+    }
+  );
+
+  updateCars(deltaTime);
+  updateScooters(deltaTime);
+  updateHazards();
+  streamWorld();
+  updateStopProximity();
+  updateCamera(deltaTime);
+
+  /* -----------------------------------------------------
+     GAME OVER CHECK
+     ----------------------------------------------------- */
+
+  if (G.food <= 0) {
+    gameOver(
+      "You starved. You literally forgot to eat, Daniel."
+    );
+  } else if (G.drink <= 0) {
+    gameOver(
+      "You got so dehydrated you passed out at the wheel."
+    );
+  } else if (
+    G.gas <= 0 &&
+    Math.abs(truck.speed) <
+      0.01
+  ) {
+    gameOver(
+      "Out of gas in the middle of nowhere. Should've filled up."
+    );
+  }
+
+  updateHUD();
+}
+
+/* =========================================================
+   UPDATE TRAFFIC CARS
+   ========================================================= */
+
+function updateCars(deltaTime) {
+  cars.forEach(function(car) {
+    if (!car.totaled) {
+      car.z +=
+        car.speed *
+        deltaTime *
+        60;
+
+      car.x =
+        centerX(car.z) +
+        car.laneOffset;
+
+      car.obj.position.set(
+        car.x,
+        0,
+        car.z
+      );
+
+      car.obj.rotation.y =
+        roadAngle(car.z);
+    }
+
+    const dx =
+      car.x -
+      truck.x;
+
+    const dz =
+      car.z -
+      truck.z;
+
+    const distance =
+      Math.hypot(
+        dx,
+        dz
+      );
+
+    if (distance >= 5) {
+      return;
+    }
+
+    if (!car.totaled) {
+      const impact =
+        Math.abs(
+          truck.speed
+        );
+
+      if (
+        impact > 0.15 &&
+        gameTime -
+          car.lastImpact >
+          0.35
+      ) {
+        car.lastImpact =
+          gameTime;
+
+        car.health -=
+          ramDamage() *
+          impact;
+
+        truck.speed *= 0.6;
+
+        shake = Math.max(
+          shake,
+          0.3
+        );
+
+        Sound.crash();
+
+        if (car.health <= 0) {
+          totalCar(car);
+        }
+      }
+    } else if (
+      !car.hooked &&
+      attached.length <
+        MAX_ATTACHED
+    ) {
+      hookCar(car);
+    }
+  });
+}
+
+function totalCar(car) {
+  car.totaled = true;
+  car.health = 0;
+  car.speed = 0;
+
+  car.obj.rotation.z =
+    (
+      Math.random() -
+      0.5
+    ) * 0.3;
+
+  car.body.material.color.multiplyScalar(
+    0.55
+  );
+
+  car.body.material.emissive =
+    new THREE.Color(
+      0x110000
+    );
+
+  showWarning(
+    "💥 " +
+    car.type.name +
+    " totaled! Touch it again to hook it.",
+    1500
+  );
+}
+
+function hookCar(car) {
+  if (
+    car.hooked ||
+    attached.length >=
+      MAX_ATTACHED
+  ) {
+    return;
+  }
+
+  car.hooked = true;
+  attached.push(car);
+
+  car.obj.rotation.z = 0;
+
+  Sound.hook();
+
+  showWarning(
+    "🪝 Hooked a " +
+    car.type.name +
+    "! Worth $" +
+    car.type.value,
+    1700
+  );
+}
+
+/* =========================================================
+   UPDATE SCOOTERS
+   ========================================================= */
+
+function updateScooters(deltaTime) {
+  scooters.forEach(function(scooter) {
+    if (!scooter.wrecked) {
+      scooter.z +=
+        scooter.speed *
+        deltaTime *
+        60;
+
+      scooter.x =
+        centerX(scooter.z) +
+        scooter.laneOffset;
+
+      scooter.obj.position.set(
+        scooter.x,
+        0,
+        scooter.z
+      );
+
+      scooter.obj.rotation.y =
+        roadAngle(scooter.z);
+
+      /* Small riding motion */
+      scooter.rider.position.y =
+        Math.sin(
+          gameTime * 8 +
+          scooter.z
+        ) * 0.025;
+
+      const dx =
+        scooter.x -
+        truck.x;
+
+      const dz =
+        scooter.z -
+        truck.z;
+
+      const distance =
+        Math.hypot(
+          dx,
+          dz
+        );
+
+      const impact =
+        Math.abs(
+          truck.speed
+        );
+
+      if (
+        distance < 3.6 &&
+        impact > 0.12
+      ) {
+        wreckScooter(
+          scooter
+        );
+      }
+    } else {
+      animateWreckedScooter(
+        scooter
+      );
+    }
+  });
+}
+
+function wreckScooter(scooter) {
+  if (scooter.wrecked) {
+    return;
+  }
+
+  scooter.wrecked = true;
+  scooter.wreckTime =
+    gameTime;
+
+  scooter.speed = 0;
+
+  /*
+    Rider jumps toward the nearest roadside.
+    This is deliberately cartoon-like and non-graphic.
+  */
+  if (
+    Math.abs(
+      scooter.laneOffset
+    ) > 1
+  ) {
+    scooter.bailDirection =
+      Math.sign(
+        scooter.laneOffset
+      );
+  } else {
+    scooter.bailDirection =
+      Math.random() < 0.5
+        ? -1
+        : 1;
+  }
+
+  scooter.scooterBody.rotation.z =
+    scooter.bailDirection *
+    1.15;
+
+  scooter.scooterBody.rotation.y =
+    (
+      Math.random() -
+      0.5
+    ) * 0.7;
+
+  truck.speed *= 0.76;
+
+  shake = Math.max(
+    shake,
+    0.25
+  );
+
+  G.money +=
+    scooter.type.value;
+
+  G.scooterWrecks++;
+
+  Sound.knock();
+
+  setTimeout(function() {
+    Sound.coin();
+  }, 100);
+
+  updateHUD();
+
+  showWarning(
+    "🛴 Wrecked a " +
+    scooter.type.name +
+    " — rider jumped clear! +$" +
+    scooter.type.value +
+    " (cannot hook)",
+    2100
+  );
+}
+
+function animateWreckedScooter(
+  scooter
+) {
+  const elapsed =
+    gameTime -
+    scooter.wreckTime;
+
+  const jumpProgress =
+    Math.min(
+      1,
+      elapsed / 0.8
+    );
+
+  /*
+    Move the rider away from the scooter.
+  */
+  scooter.rider.position.x =
+    scooter.bailDirection *
+    Math.min(
+      7,
+      elapsed * 7
+    );
+
+  /*
+    Jump arc.
+  */
+  scooter.rider.position.y =
+    Math.sin(
+      jumpProgress *
+      Math.PI
+    ) * 2.2;
+
+  /*
+    Mild cartoon tumble, returning upright at landing.
+  */
+  scooter.rider.rotation.z =
+    -scooter.bailDirection *
+    Math.max(
+      0,
+      0.45 *
+      (
+        1 -
+        jumpProgress
+      )
+    );
+
+  if (elapsed > 0.8) {
+    scooter.rider.position.y = 0;
+    scooter.rider.rotation.z = 0;
+  }
+}
+
+/* =========================================================
+   UPDATE HAZARDS
+   ========================================================= */
+
+function updateHazards() {
+  for (
+    let i = hazards.length - 1;
+    i >= 0;
+    i--
+  ) {
+    const hazard =
+      hazards[i];
+
+    const distance =
+      Math.hypot(
+        hazard.x -
+          truck.x,
+        hazard.z -
+          truck.z
+      );
+
+    if (
+      distance >= 3.6 ||
+      Math.abs(
+        truck.speed
+      ) <= 0.1
+    ) {
+      continue;
+    }
+
+    if (
+      hazard.type ===
+      "oil"
+    ) {
+      if (
+        gameTime -
+        hazard.lastHit >
+        0.35
+      ) {
+        hazard.lastHit =
+          gameTime;
+
+        truck.heading +=
+          (
+            Math.random() -
+            0.5
+          ) * 0.7;
+
+        shake = Math.max(
+          shake,
+          0.2
+        );
+
+        Sound.skid();
+
+        showWarning(
+          "🛢️ Oil slick!",
+          900
+        );
+      }
+    }
+
+    if (
+      hazard.type ===
+      "pothole" &&
+      !hazard.hit
+    ) {
+      hazard.hit = true;
+
+      truck.speed *= 0.4;
+
+      G.gas = Math.max(
+        0,
+        G.gas - 2
+      );
+
+      shake = Math.max(
+        shake,
+        0.45
+      );
+
+      Sound.thud();
+
+      scene.remove(
+        hazard.obj
+      );
+
+      hazards.splice(i, 1);
+
+      showWarning(
+        "🕳️ Pothole! Lost speed and spilled some gas.",
+        1200
+      );
+    }
+
+    if (
+      hazard.type ===
+      "cone" &&
+      !hazard.hit
+    ) {
+      hazard.hit = true;
+
+      truck.speed *= 0.78;
+
+      shake = Math.max(
+        shake,
+        0.18
+      );
+
+      Sound.knock();
+
+      hazard.obj.rotation.z =
+        1.4;
+
+      setTimeout(
+        function() {
+          scene.remove(
+            hazard.obj
+          );
+        },
+        600
+      );
+
+      hazards.splice(i, 1);
+
+      showWarning(
+        "🚧 Daniel versus cone. Daniel wins.",
+        1000
+      );
+    }
+  }
+}
+
+/* =========================================================
+   WORLD STREAMING
+   ========================================================= */
+
+function streamWorld() {
+  ensureRoad(
+    truck.z + 420
+  );
+
+  cleanRoad(
+    truck.z - 120
+  );
+
+  spawnHazards(
+    truck.z + 420
+  );
+
+  while (
+    nextStopZ <
+    truck.z + 420
+  ) {
+    makeStop(
+      nextStopZ
+    );
+
+    nextStopZ +=
+      140 +
+      Math.random() * 70;
+  }
+
+  const carsAhead =
+    cars.filter(
+      function(car) {
+        return (
+          !car.hooked &&
+          car.z > truck.z &&
+          car.z <
+            truck.z + 420
+        );
+      }
+    ).length;
+
+  if (carsAhead < 8) {
+    spawnCarAhead(
+      210 +
+      Math.random() * 180
+    );
+  }
+
+  const scootersAhead =
+    scooters.filter(
+      function(scooter) {
+        return (
+          !scooter.wrecked &&
+          scooter.z > truck.z &&
+          scooter.z <
+            truck.z + 420
+        );
+      }
+    ).length;
+
+  if (scootersAhead < 5) {
+    spawnScooterAhead(
+      190 +
+      Math.random() * 210
+    );
+  }
+
+  /* Remove cars far behind */
+  for (
+    let i = cars.length - 1;
+    i >= 0;
+    i--
+  ) {
+    const car = cars[i];
+
+    if (
+      !car.hooked &&
+      car.z <
+        truck.z - 120
+    ) {
+      scene.remove(
+        car.obj
+      );
+
+      cars.splice(i, 1);
+    }
+  }
+
+  /* Remove scooters far behind */
+  for (
+    let i = scooters.length - 1;
+    i >= 0;
+    i--
+  ) {
+    const scooter =
+      scooters[i];
+
+    if (
+      scooter.z <
+      truck.z - 120
+    ) {
+      scene.remove(
+        scooter.obj
+      );
+
+      scooters.splice(i, 1);
+    }
+  }
+
+  /* Remove old stops */
+  for (
+    let i = stops.length - 1;
+    i >= 0;
+    i--
+  ) {
+    const stop = stops[i];
+
+    if (
+      stop.z <
+      truck.z - 170
+    ) {
+      scene.remove(
+        stop.obj
+      );
+
+      stops.splice(i, 1);
+    }
+  }
+
+  /* Remove old hazards */
+  for (
+    let i = hazards.length - 1;
+    i >= 0;
+    i--
+  ) {
+    const hazard =
+      hazards[i];
+
+    if (
+      hazard.z <
+      truck.z - 140
+    ) {
+      scene.remove(
+        hazard.obj
+      );
+
+      hazards.splice(i, 1);
+    }
+  }
+}
+
+/* =========================================================
+   STOP INTERACTION
+   ========================================================= */
+
+function updateStopProximity() {
+  currentStop = null;
+
+  const prompt =
+    document.getElementById(
+      "prompt"
+    );
+
+  for (
+    let i = 0;
+    i < stops.length;
+    i++
+  ) {
+    const stop = stops[i];
+
+    const distance =
+      Math.hypot(
+        stop.x -
+          truck.x,
+        stop.z -
+          truck.z
+      );
+
+    if (
+      distance < 22 &&
+      Math.abs(
+        truck.speed
+      ) < 0.15
+    ) {
+      currentStop = stop;
+      break;
+    }
+  }
+
+  if (!currentStop) {
+    prompt.style.display =
+      "none";
+
+    return;
+  }
+
+  prompt.style.display =
+    "block";
+
+  let action;
+
+  if (
+    currentStop.type ===
+    "garage"
+  ) {
+    action =
+      "sell cars and upgrade";
+  } else if (
+    currentStop.type ===
+    "gas"
+  ) {
+    action =
+      "buy gas and panic snacks";
+  } else {
+    action =
+      "eat and drink";
+  }
+
+  prompt.innerHTML =
+    currentStop.label +
+    " — Press <b>E</b> to " +
+    action;
+}
+
+/* =========================================================
+   CAMERA
+   ========================================================= */
+
+function updateCamera(deltaTime) {
+  const cameraDistance = 16;
+  const cameraHeight = 8;
+
+  const targetX =
+    truck.x -
+    Math.sin(truck.heading) *
+    cameraDistance;
+
+  const targetZ =
+    truck.z -
+    Math.cos(truck.heading) *
+    cameraDistance;
+
+  camera.position.lerp(
+    new THREE.Vector3(
+      targetX,
+      cameraHeight,
+      targetZ
+    ),
+    0.12
+  );
+
+  if (shake > 0) {
+    camera.position.x +=
+      (
+        Math.random() -
+        0.5
+      ) *
+      shake *
+      3;
+
+    camera.position.y +=
+      (
+        Math.random() -
+        0.5
+      ) *
+      shake *
+      2;
+
+    shake = Math.max(
+      0,
+      shake -
+      deltaTime * 1.5
+    );
+  }
+
+  camera.lookAt(
+    truck.x,
+    2,
+    truck.z +
+      Math.cos(
+        truck.heading
+      ) *
+      3
+  );
+
+  /*
+    Keep the large grass plane underneath the active area.
+  */
+  grass.position.set(
+    truck.x,
+    0,
+    truck.z
+  );
+}
+
+/* =========================================================
+   HUD
+   ========================================================= */
+
+function percentage(
+  value,
+  maximum
+) {
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      value /
+      maximum *
+      100
+    )
+  );
+}
+
+let lowSoundTime = 0;
+
+let warningTimer = null;
+let temporaryWarning = false;
+
+function updateHUD() {
+  document.getElementById(
+    "food-bar"
+  ).style.width =
+    percentage(
+      G.food,
+      G.maxFood
+    ) + "%";
+
+  document.getElementById(
+    "drink-bar"
+  ).style.width =
+    percentage(
+      G.drink,
+      G.maxDrink
+    ) + "%";
+
+  document.getElementById(
+    "gas-bar"
+  ).style.width =
+    percentage(
+      G.gas,
+      maxGas()
+    ) + "%";
+
+  document.getElementById(
+    "money"
+  ).textContent =
+    Math.floor(G.money);
+
+  document.getElementById(
+    "attached"
+  ).textContent =
+    attached.length;
+
+  document.getElementById(
+    "speed"
+  ).textContent =
+    Math.round(
+      Math.abs(
+        truck.speed
+      ) * 45
+    );
+
+  document.getElementById(
+    "scooter-count"
+  ).textContent =
+    G.scooterWrecks;
+
+  const freezerInfo =
+    document.getElementById(
+      "freezer-info"
+    );
+
+  if (G.hasFreezer) {
+    freezerInfo.style.display =
+      "block";
+
+    document.getElementById(
+      "fz-food"
+    ).textContent =
+      G.fzFood;
+
+    document.getElementById(
+      "fz-drink"
+    ).textContent =
+      G.fzDrink;
+  }
+
+  if (!temporaryWarning) {
+    refreshLowWarning();
+  }
+}
+
+function refreshLowWarning() {
+  const lowItems = [];
+
+  if (G.food < 20) {
+    lowItems.push(
+      "🍔 FOOD"
+    );
+  }
+
+  if (G.drink < 20) {
+    lowItems.push(
+      "🥤 DRINK"
+    );
+  }
+
+  if (G.gas < 20) {
+    lowItems.push(
+      "⛽ GAS"
+    );
+  }
+
+  if (lowItems.length > 0) {
+    const warning =
+      document.getElementById(
+        "warn"
+      );
+
+    warning.textContent =
+      "⚠️ LOW: " +
+      lowItems.join(" · ");
+
+    warning.style.display =
+      "block";
+
+    if (
+      gameTime -
+      lowSoundTime >
+      1.2
+    ) {
+      lowSoundTime =
+        gameTime;
+
+      Sound.low();
+    }
+  } else {
+    document.getElementById(
+      "warn"
+    ).style.display =
+      "none";
+  }
+}
+
+function showWarning(
+  message,
+  duration
+) {
+  const warning =
+    document.getElementById(
+      "warn"
+    );
+
+  if (warningTimer) {
+    clearTimeout(
+      warningTimer
+    );
+  }
+
+  warning.textContent =
+    message;
+
+  warning.style.display =
+    "block";
+
+  temporaryWarning =
+    duration > 0;
+
+  if (duration > 0) {
+    warningTimer =
+      setTimeout(
+        function() {
+          temporaryWarning =
+            false;
+
+          refreshLowWarning();
+        },
+        duration
+      );
+  }
+}
+
+/* =========================================================
+   MENU INTERACTION
+   ========================================================= */
+
+function handleInteract() {
+  if (state === "menu") {
+    closeMenu();
+    return;
+  }
+
+  if (
+    state === "playing" &&
+    currentStop
+  ) {
+    openMenu(
+      currentStop
+    );
+  }
+}
+
+function openMenu(stop) {
+  state = "menu";
+
+  document.getElementById(
+    "menu"
+  ).style.display = "flex";
+
+  Sound.engineOff();
+
+  document.getElementById(
+    "menu-money-val"
+  ).textContent =
+    Math.floor(G.money);
+
+  const title =
+    document.getElementById(
+      "menu-title"
+    );
+
+  const subtitle =
+    document.getElementById(
+      "menu-sub"
+    );
+
+  const body =
+    document.getElementById(
+      "menu-body"
+    );
+
+  body.innerHTML = "";
+
+  if (stop.type === "bar") {
+    buildBarMenu(
+      title,
+      subtitle,
+      body
+    );
+  }
+
+  if (stop.type === "gas") {
+    buildGasMenu(
+      title,
+      subtitle,
+      body
+    );
+  }
+
+  if (stop.type === "garage") {
+    buildGarageMenu(
+      title,
+      subtitle,
+      body
+    );
+  }
+}
+
+function buildBarMenu(
+  title,
+  subtitle,
+  body
+) {
+  title.textContent =
+    "🍔🍺 Diner & Bar";
+
+  subtitle.textContent =
+    "Cheap grub and cold drinks. Fill up before you flop.";
+
+  body.appendChild(
+    shopRow(
+      "Greasy Burger",
+      "+45 food",
+      "$12",
+      function() {
+        buyConsume(
+          "food",
+          45,
+          12
+        );
+      }
+    )
+  );
+
+  body.appendChild(
+    shopRow(
+      "Big Drink",
+      "+45 drink",
+      "$10",
+      function() {
+        buyConsume(
+          "drink",
+          45,
+          10
+        );
+      }
+    )
+  );
+
+  body.appendChild(
+    shopRow(
+      "Full Meal Deal",
+      "+45 food and drink",
+      "$28",
+      function() {
+        buyConsume(
+          "both",
+          45,
+          28
+        );
+      }
+    )
+  );
+
+  if (G.hasFreezer) {
+    body.appendChild(
+      shopRow(
+        "🧊 Freezer Burger",
+        "+1 stored food",
+        "$14",
+        function() {
+          buyFreezer(
+            "food",
+            14
+          );
+        }
+      )
+    );
+
+    body.appendChild(
+      shopRow(
+        "🧊 Freezer Drink",
+        "+1 stored drink",
+        "$11",
+        function() {
+          buyFreezer(
+            "drink",
+            11
+          );
+        }
+      )
+    );
+  }
+}
+
+function buildGasMenu(
+  title,
+  subtitle,
+  body
+) {
+  title.textContent =
+    "⛽ Gas Station";
+
+  subtitle.textContent =
+    "Overpriced everything, but useful in a panic.";
+
+  body.appendChild(
+    shopRow(
+      "Fill Gas (+40)",
+      "Add up to 40 gas",
+      "$48",
+      function() {
+        buyGas(
+          40,
+          48
+        );
+      }
+    )
+  );
+
+  body.appendChild(
+    shopRow(
+      "Full Tank",
+      "Fill to maximum",
+      "Varies",
+      buyGasFull
+    )
+  );
+
+  body.appendChild(
+    shopRow(
+      "Panic Hot Dog",
+      "+40 food",
+      "$26",
+      function() {
+        buyConsume(
+          "food",
+          40,
+          26
+        );
+      }
+    )
+  );
+
+  body.appendChild(
+    shopRow(
+      "Panic Slushie",
+      "+40 drink",
+      "$22",
+      function() {
+        buyConsume(
+          "drink",
+          40,
+          22
+        );
+      }
+    )
+  );
+
+  if (G.hasFreezer) {
+    body.appendChild(
+      shopRow(
+        "🧊 Pricey Freezer Food",
+        "+1 stored food",
+        "$30",
+        function() {
+          buyFreezer(
+            "food",
+            30
+          );
+        }
+      )
+    );
+
+    body.appendChild(
+      shopRow(
+        "🧊 Pricey Freezer Drink",
+        "+1 stored drink",
+        "$26",
+        function() {
+          buyFreezer(
+            "drink",
+            26
+          );
+        }
+      )
+    );
+  }
+}
+
+function buildGarageMenu(
+  title,
+  subtitle,
+  body
+) {
+  title.textContent =
+    "🔧 Garage";
+
+  subtitle.textContent =
+    "Drop off wrecked cars for cash and upgrade the truck.";
+
+  if (attached.length > 0) {
+    const saleTotal =
+      attached.reduce(
+        function(total, car) {
+          return (
+            total +
+            car.type.value
+          );
+        },
+        0
+      );
+
+    const carNames =
+      attached
+        .map(function(car) {
+          return car.type.name;
+        })
+        .join(", ");
+
+    body.appendChild(
+      shopRow(
+        "Sell " +
+        attached.length +
+        " car(s)",
+        carNames,
+        "+$" + saleTotal,
+        sellCars,
+        true
+      )
+    );
+  } else {
+    const emptyMessage =
+      document.createElement(
+        "div"
+      );
+
+    emptyMessage.className =
+      "row";
+
+    emptyMessage.innerHTML =
+      '<span class="desc">' +
+      "No cars hooked up — go total some traffic!" +
+      "</span>";
+
+    body.appendChild(
+      emptyMessage
+    );
+  }
+
+  body.appendChild(
+    menuHeader(
+      "Truck Upgrades"
+    )
+  );
+
+  upgradeRow(
+    body,
+    "⛽ Bigger Gas Tank",
+    G.gasTankLvl,
+    [500, 1200, 2500],
+    function(level) {
+      return (
+        "Max gas: " +
+        [100, 150, 200, 260][level]
+      );
+    },
+    function() {
+      G.gasTankLvl++;
+    }
+  );
+
+  upgradeRow(
+    body,
+    "🏎️ Turbo",
+    G.turboLvl,
+    [600, 1400, 2800],
+    function(level) {
+      return (
+        "Top speed: " +
+        Math.round(
+          [1.3, 1.7, 2.1, 2.6][level] *
+          45
+        ) +
+        " mph"
+      );
+    },
+    function() {
+      G.turboLvl++;
+    }
+  );
+
+  upgradeRow(
+    body,
+    "🛡️ Ram Armor",
+    G.armorLvl,
+    [400, 1000, 2000],
+    function(level) {
+      return (
+        "Ram damage: " +
+        [22, 38, 55, 80][level]
+      );
+    },
+    function() {
+      G.armorLvl++;
+    }
+  );
+
+  if (!G.hasFreezer) {
+    body.appendChild(
+      shopRow(
+        "🧊 Mini Freezer",
+        "Store food and drinks for the road",
+        "$800",
+        function() {
+          if (spend(800)) {
+            G.hasFreezer = true;
+
+            openMenu(
+              currentStop
+            );
+          }
+        }
+      )
+    );
+  } else {
+    const owned =
+      document.createElement(
+        "div"
+      );
+
+    owned.className = "row";
+
+    owned.innerHTML =
+      '<span class="name">' +
+      "🧊 Mini Freezer" +
+      "</span>" +
+      '<span class="desc">' +
+      "Owned ✔ — F to eat, G to drink" +
+      "</span>";
+
+    body.appendChild(owned);
+  }
+}
+
+function menuHeader(text) {
+  const header =
+    document.createElement(
+      "h2"
+    );
+
+  header.textContent =
+    text;
+
+  header.style.marginTop =
+    "14px";
+
+  header.style.fontSize =
+    "18px";
+
+  return header;
+}
+
+function shopRow(
+  name,
+  description,
+  price,
+  onBuy,
+  isSale
+) {
+  const row =
+    document.createElement(
+      "div"
+    );
+
+  row.className = "row";
+
+  row.innerHTML =
+    "<div>" +
+      '<div class="name">' +
+        name +
+      "</div>" +
+      '<div class="desc">' +
+        description +
+      "</div>" +
+    "</div>";
+
+  const button =
+    document.createElement(
+      "button"
+    );
+
+  button.className =
+    "buy" +
+    (
+      isSale
+        ? " sell"
+        : ""
+    );
+
+  button.textContent =
+    price;
+
+  button.onclick =
+    onBuy;
+
+  row.appendChild(
+    button
+  );
+
+  return row;
+}
+
+function upgradeRow(
+  body,
+  name,
+  level,
+  costs,
+  descriptionFunction,
+  applyUpgrade
+) {
+  const maximum =
+    level >= 3;
+
+  const row =
+    document.createElement(
+      "div"
+    );
+
+  row.className = "row";
+
+  let description =
+    "Now: " +
+    descriptionFunction(level);
+
+  if (!maximum) {
+    description +=
+      " → Next: " +
+      descriptionFunction(
+        level + 1
+      );
+  }
+
+  row.innerHTML =
+    "<div>" +
+      '<div class="name">' +
+        name +
+        ' <span class="desc">' +
+          "[Level " +
+          level +
+          "/3]" +
+        "</span>" +
+      "</div>" +
+      '<div class="desc">' +
+        description +
+      "</div>" +
+    "</div>";
+
+  const button =
+    document.createElement(
+      "button"
+    );
+
+  button.className = "buy";
+
+  if (maximum) {
+    button.textContent = "MAX";
+    button.disabled = true;
+  } else {
+    const cost =
+      costs[level];
+
+    button.textContent =
+      "$" + cost;
+
+    button.onclick =
+      function() {
+        if (spend(cost)) {
+          applyUpgrade();
+
+          openMenu(
+            currentStop
+          );
+        }
+      };
+  }
+
+  row.appendChild(button);
+  body.appendChild(row);
+}
+
+function spend(amount) {
+  if (G.money < amount) {
+    showWarning(
+      "💸 Not enough cash!",
+      1400
+    );
+
+    return false;
+  }
+
+  G.money -= amount;
+
+  Sound.buy();
+  updateHUD();
+
+  document.getElementById(
+    "menu-money-val"
+  ).textContent =
+    Math.floor(G.money);
+
+  return true;
+}
+
+function buyConsume(
+  type,
+  amount,
+  cost
+) {
+  if (!spend(cost)) {
+    return;
+  }
+
+  if (
+    type === "food" ||
+    type === "both"
+  ) {
+    G.food = Math.min(
+      G.maxFood,
+      G.food + amount
+    );
+  }
+
+  if (
+    type === "drink" ||
+    type === "both"
+  ) {
+    G.drink = Math.min(
+      G.maxDrink,
+      G.drink + amount
+    );
+  }
+
+  updateHUD();
+}
+
+function buyFreezer(
+  type,
+  cost
+) {
+  if (!spend(cost)) {
+    return;
+  }
+
+  if (type === "food") {
+    G.fzFood++;
+  } else {
+    G.fzDrink++;
+  }
+
+  openMenu(
+    currentStop
+  );
+}
+
+function buyGas(
+  amount,
+  cost
+) {
+  if (!spend(cost)) {
+    return;
+  }
+
+  G.gas = Math.min(
+    maxGas(),
+    G.gas + amount
+  );
+
+  updateHUD();
+}
+
+function buyGasFull() {
+  const needed =
+    maxGas() -
+    G.gas;
+
+  if (needed <= 0) {
+    showWarning(
+      "The tank is already full!",
+      1200
+    );
+
+    return;
+  }
+
+  const cost =
+    Math.ceil(
+      needed * 1.2
+    );
+
+  if (!spend(cost)) {
+    return;
+  }
+
+  G.gas = maxGas();
+  updateHUD();
+}
+
+function sellCars() {
+  const total =
+    attached.reduce(
+      function(sum, car) {
+        return (
+          sum +
+          car.type.value
+        );
+      },
+      0
+    );
+
+  G.money += total;
+
+  Sound.coin();
+
+  attached.forEach(
+    function(car) {
+      scene.remove(
+        car.obj
+      );
+
+      const carIndex =
+        cars.indexOf(car);
+
+      if (carIndex >= 0) {
+        cars.splice(
+          carIndex,
+          1
+        );
+      }
+    }
+  );
+
+  attached.length = 0;
+
+  showWarning(
+    "💰 Sold the wrecks for $" +
+    total +
+    "!",
+    1800
+  );
+
+  updateHUD();
+
+  openMenu(
+    currentStop
+  );
+}
+
+function eatFromFreezer() {
+  if (state !== "playing") {
+    return;
+  }
+
+  if (
+    !G.hasFreezer ||
+    G.fzFood <= 0
+  ) {
+    showWarning(
+      "🧊 No food in the freezer.",
+      1200
+    );
+
+    return;
+  }
+
+  G.fzFood--;
+
+  G.food = Math.min(
+    G.maxFood,
+    G.food + 45
+  );
+
+  Sound.buy();
+  updateHUD();
+
+  showWarning(
+    "🍔 Ate freezer food. +45 food",
+    1200
+  );
+}
+
+function drinkFromFreezer() {
+  if (state !== "playing") {
+    return;
+  }
+
+  if (
+    !G.hasFreezer ||
+    G.fzDrink <= 0
+  ) {
+    showWarning(
+      "🧊 No drinks in the freezer.",
+      1200
+    );
+
+    return;
+  }
+
+  G.fzDrink--;
+
+  G.drink = Math.min(
+    G.maxDrink,
+    G.drink + 45
+  );
+
+  Sound.buy();
+  updateHUD();
+
+  showWarning(
+    "🥤 Drank from the freezer. +45 drink",
+    1200
+  );
+}
+
+function closeMenu() {
+  document.getElementById(
+    "menu"
+  ).style.display = "none";
+
+  if (state === "menu") {
+    state = "playing";
+  }
+}
+
+/* =========================================================
+   GAME OVER
+   ========================================================= */
+
+function gameOver(reason) {
+  if (state === "over") {
+    return;
+  }
+
+  state = "over";
+
+  Sound.engineOff();
+  Sound.gameOver();
+
+  document.getElementById(
+    "over-reason"
+  ).textContent =
+    reason;
+
+  document.getElementById(
+    "over-money"
+  ).textContent =
+    Math.floor(G.money);
+
+  document.getElementById(
+    "over"
+  ).style.display =
+    "flex";
+}
+
+/* =========================================================
+   MAIN LOOP
+   ========================================================= */
+
+let lastFrameTime =
+  performance.now();
+
+function loop(currentTime) {
+  const deltaTime =
+    Math.min(
+      0.05,
+      (
+        currentTime -
+        lastFrameTime
+      ) / 1000
+    );
+
+  lastFrameTime =
+    currentTime;
+
+  update(deltaTime);
+
+  renderer.render(
+    scene,
+    camera
+  );
+
+  requestAnimationFrame(
+    loop
+  );
+}
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+
+if (
+  typeof THREE ===
+  "undefined"
+) {
+  document.getElementById(
+    "intro"
+  ).innerHTML =
+    "<h1>THREE.JS COULD NOT LOAD</h1>" +
+    '<div class="room">' +
+      "Check your internet connection and reload the page." +
+    "</div>";
+} else {
+  initThree();
+
+  requestAnimationFrame(
+    loop
+  );
+}
+</script>
+
+</body>
+</html>
